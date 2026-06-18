@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vaultx",
+  "main": ".open-next/worker.js",
   "compatibility_date": "2026-06-18",
   "observability": {
     "enabled": true
@@ -8,6 +9,10 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
   "build": {
     "command": "npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion"
   }
