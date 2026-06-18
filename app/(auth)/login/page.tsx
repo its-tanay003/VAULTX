@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { ShieldCheck, Mail, Loader2, Chrome } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function LoginPage() {
+function LoginForm() {
   const searchParams = useSearchParams();
   const next         = searchParams.get("next") ?? "/dashboard";
   const authError    = searchParams.get("error");
@@ -192,5 +192,17 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-vault-bg flex flex-col items-center justify-center p-4">
+        <div className="text-sm text-vault-muted">Loading...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
