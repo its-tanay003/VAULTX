@@ -35,3 +35,7 @@ next-env.d.ts
 
 # agents
 .agents/
+
+# cloudflare
+.open-next/
+.wrangler/
