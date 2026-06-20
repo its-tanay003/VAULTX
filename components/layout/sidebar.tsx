@@ -13,10 +13,10 @@ import { useState }      from "react";
 import type { UserRole } from "@/lib/supabase/types";
 
 /**
- * UPDATED Week 7: root <aside> now uses `hidden md:flex` so it never
- * renders on mobile viewports. MobileSidebar (a drawer) takes over below
- * the md breakpoint. This was a real gap before — the fixed-width sidebar
- * had no mobile fallback at all.
+ * UPDATED Week 8: STUB_MODULES (PTaaS, AI Red Team) are now real <Link>s
+ * pointing to their dedicated stub pages instead of unclickable divs.
+ * "Coming soon" badge stays, but clicking now lands on a real page with
+ * a roadmap preview and a waitlist signup — no more dead ends in the nav.
  */
 
 const ORG_NAV = [
@@ -42,8 +42,8 @@ const BOTTOM_NAV = [
 ];
 
 const STUB_MODULES = [
-  { icon: Shield, label: "PTaaS",       badge: "Soon" },
-  { icon: Zap,    label: "AI Red Team", badge: "Soon" },
+  { href: "/dashboard/ptaas",       icon: Shield, label: "PTaaS",       badge: "Soon" },
+  { href: "/dashboard/ai-red-team", icon: Zap,    label: "AI Red Team", badge: "Soon" },
 ];
 
 interface SidebarProps {
@@ -109,16 +109,20 @@ export function Sidebar({ role, fullName, email, avatarUrl }: SidebarProps) {
         {!collapsed && (
           <div className="pt-3 pb-1">
             <div className="px-3 mb-1.5 text-[10px] font-medium text-vault-muted uppercase tracking-wider">
-              Coming soon
+              Roadmap
             </div>
-            {STUB_MODULES.map(({ icon: Icon, label, badge }) => (
-              <div key={label} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-vault-muted/50 cursor-not-allowed">
+            {STUB_MODULES.map(({ href, icon: Icon, label, badge }) => (
+              <Link
+                key={href}
+                href={href}
+                className={cn("nav-item", isActive(href) && "active")}
+              >
                 <Icon className="w-4 h-4 shrink-0" />
                 <span>{label}</span>
                 <span className="ml-auto text-[9px] font-medium px-1.5 py-0.5 bg-vault-teal/10 text-vault-teal rounded">
                   {badge}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         )}
