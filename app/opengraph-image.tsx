@@ -11,7 +11,7 @@ import { ImageResponse } from "next/og";
  * tags — no manual <meta property="og:image"> needed in layout.tsx.
  */
 
-export const runtime = "edge";
+export const dynamic = "force-dynamic";
 export const alt = "VAULTX — AI-Powered Security Intelligence Platform";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

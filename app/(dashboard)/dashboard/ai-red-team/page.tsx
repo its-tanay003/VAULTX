@@ -1,80 +1,119 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import { redirect }      from "next/navigation";
+import Link               from "next/link";
+import {
+  Zap, Plus, Github, FileText, ChevronRight, Clock, Bug,
+} from "lucide-react";
+import { EmptyState }    from "@/components/ui/empty-state";
+import { AggressionBadge } from "@/components/red-team/aggression-badge";
+import { formatRelativeTime } from "@/lib/utils";
+import type { Metadata } from "next";
 
-import { useState, useTransition } from "react";
-import { Zap, ArrowRight, CheckCircle2, Loader2, Sparkles } from "lucide-react";
-import { joinWaitlist } from "@/app/actions/waitlist";
-import { toast } from "sonner";
+export const metadata: Metadata = { title: "AI Red Team" };
 
-export default function AIRedTeamPage() {
-  const [joined,  setJoined]  = useState(false);
-  const [pending, start]      = useTransition();
+export default async function AIRedTeamPage() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  function handleJoin() {
-    start(async () => {
-      try {
-        await joinWaitlist("ai_red_team");
-        setJoined(true);
-        toast.success("You're on the list — we'll notify you at launch");
-      } catch {
-        toast.error("Failed to join waitlist");
-      }
-    });
+  const { data: profile } = await supabase
+    .from("profiles").select("role, org_id").eq("id", user.id).single();
+
+  if (profile?.role !== "org" || !profile.org_id) {
+    // AI Red Team is org-only — researchers see findings through the
+    // normal submissions queue (attributed to the AI agent), not here.
+    redirect("/dashboard/researcher");
   }
 
+  const { data: targets } = await supabase
+    .from("red_team_targets")
+    .select(`
+      id, name, target_type, target_value, aggression_level,
+      is_active, last_scanned_at,
+      red_team_scans(id, status, findings_created, started_at)
+    `)
+    .eq("org_id", profile.org_id)
+    .order("created_at", { ascending: false });
+
+  const items = targets ?? [];
+
   return (
-    <div className="max-w-2xl mx-auto animate-in">
-      <div className="vault-card p-10 text-center relative overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-32 bg-glow-teal-sm pointer-events-none" />
-
-        <div className="relative">
-          <div className="w-14 h-14 rounded-2xl bg-vault-teal/10 border border-vault-teal/30 flex items-center justify-center mx-auto mb-5">
-            <Zap className="w-7 h-7 text-vault-teal" />
-          </div>
-
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 bg-vault-teal/10 text-vault-teal border border-vault-teal/20 rounded-full mb-4">
-            <Sparkles className="w-3 h-3" /> On the roadmap
-          </span>
-
-          <h1 className="text-2xl font-semibold mb-3">AI Red Team</h1>
-          <p className="text-sm text-vault-muted leading-relaxed max-w-md mx-auto mb-8">
-            Autonomous AI agents that probe your attack surface continuously —
-            not a one-time scan, but an ongoing adversarial process that
-            surfaces findings into the same triage queue your human
-            researchers already use. First-class AI red teaming as a
-            platform primitive, not a bolt-on.
+    <div className="max-w-3xl mx-auto space-y-5 animate-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold flex items-center gap-2">
+            <Zap className="w-5 h-5 text-vault-teal" /> AI Red Team
+          </h1>
+          <p className="text-sm text-vault-muted mt-0.5">
+            Continuous AI-driven adversarial analysis — findings route into your normal Submissions queue
           </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left mb-8 max-w-md mx-auto">
-            {[
-              "Continuous autonomous probing",
-              "Findings route through same triage",
-              "Configurable aggression levels",
-              "Full reasoning trace per finding",
-            ].map((f) => (
-              <div key={f} className="flex items-center gap-2 text-xs text-vault-subtle">
-                <CheckCircle2 className="w-3.5 h-3.5 text-vault-teal/60 shrink-0" />
-                {f}
-              </div>
-            ))}
-          </div>
-
-          {joined ? (
-            <div className="flex items-center justify-center gap-2 text-sm text-vault-teal font-medium">
-              <CheckCircle2 className="w-4 h-4" /> You're on the waitlist
-            </div>
-          ) : (
-            <button
-              onClick={handleJoin}
-              disabled={pending}
-              className="btn-teal inline-flex items-center gap-2 disabled:opacity-50"
-            >
-              {pending
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <>Join the waitlist <ArrowRight className="w-4 h-4" /></>}
-            </button>
-          )}
         </div>
+        <Link href="/dashboard/ai-red-team/new" className="btn-teal flex items-center gap-2 text-sm">
+          <Plus className="w-4 h-4" /> New Target
+        </Link>
       </div>
+
+      <div className="vault-card p-4 border-vault-teal/20 flex gap-3">
+        <Zap className="w-4 h-4 text-vault-teal shrink-0 mt-0.5" />
+        <p className="text-xs text-vault-muted leading-relaxed">
+          AI Red Team performs AI-assisted static analysis (for connected repos) or threat modeling
+          (for described scope) — not live network exploitation. Every finding becomes a real submission
+          in your <Link href="/dashboard/org/submissions" className="text-vault-teal hover:underline">Submissions queue</Link>,
+          attributed to the AI agent, requiring the same human triage as any researcher report.
+        </p>
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyState
+          icon={<Zap className="w-6 h-6" />}
+          title="No targets yet"
+          description="Connect a public GitHub repo or describe a system scope for continuous AI-driven adversarial review."
+          action={{ href: "/dashboard/ai-red-team/new", label: "Add a target" }}
+        />
+      ) : (
+        <div className="vault-card divide-y divide-vault-border">
+          {items.map((target) => {
+            const scans = Array.isArray(target.red_team_scans) ? target.red_team_scans : [];
+            const totalFindings = scans.reduce((sum, s) => sum + (s.findings_created ?? 0), 0);
+            const scanCount = scans.length;
+
+            return (
+              <Link
+                key={target.id}
+                href={`/dashboard/ai-red-team/${target.id}`}
+                className="flex items-center gap-4 p-4 hover:bg-vault-elevated/50 transition-colors group"
+              >
+                <div className="w-9 h-9 rounded-lg bg-vault-teal/10 border border-vault-teal/20 flex items-center justify-center shrink-0">
+                  {target.target_type === "github_repo"
+                    ? <Github className="w-4 h-4 text-vault-teal" />
+                    : <FileText className="w-4 h-4 text-vault-teal" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate group-hover:text-vault-teal transition-colors">
+                    {target.name}
+                  </p>
+                  <p className="text-xs text-vault-muted mt-0.5 flex items-center gap-2 flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {target.last_scanned_at ? `Last scanned ${formatRelativeTime(target.last_scanned_at)}` : "Never scanned"}
+                    </span>
+                    {totalFindings > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Bug className="w-3 h-3" /> {totalFindings} finding{totalFindings !== 1 ? "s" : ""} across {scanCount} scan{scanCount !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {!target.is_active && (
+                      <span className="text-zinc-500">Paused</span>
+                    )}
+                  </p>
+                </div>
+                <AggressionBadge level={target.aggression_level} />
+                <ChevronRight className="w-4 h-4 text-vault-muted shrink-0 group-hover:text-vault-teal transition-colors" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ const ORG_NAV = [
   { href: "/dashboard/org/programs",    icon: Target,          label: "Programs" },
   { href: "/dashboard/org/submissions", icon: Bug,             label: "Submissions" },
   { href: "/dashboard/org/rewards",     icon: Trophy,          label: "Rewards" },
+  { href: "/dashboard/ptaas",           icon: Shield,          label: "PTaaS" },
   { href: "/dashboard/code-quality",    icon: Code2,           label: "Code Quality" },
 ];
 
@@ -26,6 +27,7 @@ const RESEARCHER_NAV = [
   { href: "/dashboard/researcher/programs",    icon: Target,          label: "Programs" },
   { href: "/dashboard/researcher/submissions", icon: FileSearch,      label: "My Reports" },
   { href: "/dashboard/researcher/rewards",     icon: Trophy,          label: "Earnings" },
+  { href: "/dashboard/ptaas",                   icon: Shield,          label: "PTaaS" },
   { href: "/dashboard/researcher/leaderboard", icon: BarChart3,       label: "Leaderboard" },
   { href: "/dashboard/code-quality",           icon: Code2,           label: "Code Quality" },
 ];
@@ -36,8 +38,7 @@ const BOTTOM_NAV = [
 ];
 
 const STUB_MODULES = [
-  { icon: Shield, label: "PTaaS" },
-  { icon: Zap,    label: "AI Red Team" },
+  { href: "/dashboard/ai-red-team", icon: Zap,    label: "AI Red Team" },
 ];
 
 interface Props {
@@ -135,10 +136,20 @@ export function MobileSidebar({ role, fullName, email, avatarUrl }: Props) {
                   <div className="px-3 mb-1.5 text-[10px] font-medium text-vault-muted uppercase tracking-wider">
                     Coming soon
                   </div>
-                  {STUB_MODULES.map(({ icon: Icon, label }) => (
-                    <div key={label} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-vault-muted/50">
+                  {STUB_MODULES.map(({ href, icon: Icon, label }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                        isActive(href)
+                          ? "text-vault-teal bg-vault-teal-faint border border-vault-border"
+                          : "text-vault-muted hover:text-vault-text hover:bg-vault-elevated"
+                      )}
+                    >
                       <Icon className="w-4.5 h-4.5 shrink-0" /> {label}
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </nav>

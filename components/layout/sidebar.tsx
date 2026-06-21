@@ -24,6 +24,7 @@ const ORG_NAV = [
   { href: "/dashboard/org/programs",    icon: Target,          label: "Programs" },
   { href: "/dashboard/org/submissions", icon: Bug,             label: "Submissions" },
   { href: "/dashboard/org/rewards",     icon: Trophy,          label: "Rewards" },
+  { href: "/dashboard/ptaas",           icon: Shield,          label: "PTaaS" },
   { href: "/dashboard/code-quality",    icon: Code2,           label: "Code Quality" },
 ];
 
@@ -32,6 +33,7 @@ const RESEARCHER_NAV = [
   { href: "/dashboard/researcher/programs",    icon: Target,          label: "Programs" },
   { href: "/dashboard/researcher/submissions", icon: FileSearch,      label: "My Reports" },
   { href: "/dashboard/researcher/rewards",     icon: Trophy,          label: "Earnings" },
+  { href: "/dashboard/ptaas",                   icon: Shield,          label: "PTaaS" },
   { href: "/dashboard/researcher/leaderboard", icon: BarChart3,       label: "Leaderboard" },
   { href: "/dashboard/code-quality",           icon: Code2,           label: "Code Quality" },
 ];
@@ -42,7 +44,6 @@ const BOTTOM_NAV = [
 ];
 
 const STUB_MODULES = [
-  { href: "/dashboard/ptaas",       icon: Shield, label: "PTaaS",       badge: "Soon" },
   { href: "/dashboard/ai-red-team", icon: Zap,    label: "AI Red Team", badge: "Soon" },
 ];
 
