@@ -3,11 +3,12 @@ import { redirect, notFound }    from "next/navigation";
 import Link                      from "next/link";
 import {
   ChevronLeft, Bug, Globe, Lock, Edit, Pause, Play,
-  Archive, Clock, Trophy, CheckCircle2, XCircle, Copy,
+  Archive, Clock, Trophy, CheckCircle2, XCircle,
   Shield, AlertTriangle,
 } from "lucide-react";
 import { StatCard }              from "@/components/ui/stat-card";
 import { ProgramStatusControl }  from "@/components/programs/program-status-control";
+import { CopyButton }            from "@/components/ui/copy-button";
 import {
   formatCurrency, formatDate, formatRelativeTime, truncate,
 } from "@/lib/utils";
@@ -290,13 +291,7 @@ export default async function ProgramDetailPage({ params }: Props) {
               <code className="text-[11px] font-mono text-vault-muted flex-1 truncate">
                 {program.id}
               </code>
-              <button
-                className="text-vault-muted hover:text-vault-teal transition-colors"
-                onClick={() => navigator?.clipboard?.writeText(program.id)}
-                title="Copy ID"
-              >
-                <Copy className="w-3 h-3" />
-              </button>
+              <CopyButton text={program.id} />
             </div>
           </div>
 

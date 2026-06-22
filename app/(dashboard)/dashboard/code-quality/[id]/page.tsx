@@ -63,8 +63,22 @@ export default async function CodeScanDetailPage({ params }: Props) {
 
   if (!repo) notFound();
 
-  const allScans = (Array.isArray(repo.code_scans) ? repo.code_scans : [])
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const scansArray = (repo.code_scans ?? []) as Array<{
+    id: string;
+    status: string;
+    scan_type: string;
+    score: number;
+    summary: string;
+    findings: any;
+    files_scanned: number;
+    error: string | null;
+    created_at: string;
+    completed_at: string | null;
+  }>;
+
+  const allScans = [...scansArray].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 
   // Latest general scan + latest web3 scan shown separately
   const latestGeneral = allScans.find((s) => s.scan_type === "general" || !s.scan_type) ?? null;
