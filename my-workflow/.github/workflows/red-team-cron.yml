@@ -1,0 +1,51 @@
+name: AI Red Team Scheduled Scans
+
+# Runs daily at 06:00 UTC. GitHub Actions scheduled workflows are free
+# on public repos and included in the free tier minutes for private
+# repos — this costs nothing beyond the Claude/Gemini API tokens spent
+# per scan, same zero-budget constraint as everything else in VAULTX.
+#
+# Manual trigger (workflow_dispatch) is included so you can kick off a
+# scan run on demand — useful right before a demo, or to test this
+# workflow without waiting for the schedule.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-scans:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger scheduled AI Red Team scans
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.VAULT_APP_URL }}/api/red-team/run-scheduled-scans" \
+            -H "x-vault-secret: ${{ secrets.VAULT_INTERNAL_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "Response: $body"
+          echo "HTTP status: $http_code"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::Scheduled scan trigger failed with status $http_code"
+            exit 1
+          fi
+
+# ─── Setup required (one-time) ─────────────────────────────────────────────
+# In your GitHub repo: Settings → Secrets and variables → Actions → New
+# repository secret. Add both of these:
+#
+#   VAULT_APP_URL          e.g. https://your-real-production-domain.com
+#                           (no trailing slash)
+#
+#   VAULT_INTERNAL_SECRET   same value as the VAULT_INTERNAL_SECRET in
+#                           your Cloudflare Pages production environment
+#                           variables (Week 4) — these must match exactly,
+#                           since this is the shared secret that
+#                           authenticates the cron job to your API route
+#                           without needing a real user session.
