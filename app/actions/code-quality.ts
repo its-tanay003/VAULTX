@@ -1,13 +1,26 @@
 "use server";
 
-import { createClient }   from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
-import { redirect }       from "next/navigation";
+/**
+ * UPDATED Week 12: app/actions/code-quality.ts
+ *
+ * Full drop-in replacement for the Week 6 version. Adds:
+ *   - runWeb3Audit()  — Solidity-specific smart contract audit
+ *   - connectRepo()   — now accepts an optional scan_type parameter
+ *
+ * The original runScan() (general code quality) is unchanged.
+ */
+
+import { createClient }    from "@/lib/supabase/server";
+import { revalidatePath }  from "next/cache";
+import { redirect }        from "next/navigation";
 import {
   parseGithubUrl, fetchRepoMetadata, fetchRepoTree,
-  selectPriorityFiles, fetchFiles,
+  selectPriorityFiles, selectPrioritySolidityFiles, fetchFiles,
 } from "@/lib/github/client";
 import { runCodeQualityScan } from "@/lib/ai/code-review";
+import { runSmartContractAudit } from "@/lib/ai/smart-contract-audit";
+
+const SOL_EXTENSIONS = [".sol"];
 
 /* ─── Connect a public GitHub repo ────────────────────────────────────────── */
 export async function connectRepo(formData: FormData) {
@@ -21,12 +34,10 @@ export async function connectRepo(formData: FormData) {
   const parsed = parseGithubUrl(githubUrl);
   if (!parsed) throw new Error("Invalid GitHub URL — use format: https://github.com/owner/repo");
 
-  // Verify repo exists and is public
   const meta = await fetchRepoMetadata(parsed.owner, parsed.repo);
 
   const { data: profile } = await supabase
     .from("profiles").select("org_id, role").eq("id", user.id).single();
-
   const isOrg = ["org", "triager", "admin"].includes(profile?.role ?? "") && profile?.org_id;
 
   const { data: repo, error } = await supabase
@@ -49,10 +60,7 @@ export async function connectRepo(formData: FormData) {
   }
 
   revalidatePath("/dashboard/code-quality");
-
-  // Kick off first scan immediately (fire and forget)
   runScan(repo.id).catch(console.error);
-
   redirect(`/dashboard/code-quality/${repo.id}`);
 }
 
@@ -64,7 +72,7 @@ export async function disconnectRepo(repoId: string) {
   revalidatePath("/dashboard/code-quality");
 }
 
-/* ─── Run (or re-run) a scan ──────────────────────────────────────────────── */
+/* ─── Run a general code quality scan (unchanged from Week 6) ─────────────── */
 export async function runScan(repoId: string): Promise<void> {
   const supabase = createClient();
 
@@ -72,13 +80,12 @@ export async function runScan(repoId: string): Promise<void> {
     .from("code_repos").select("*").eq("id", repoId).single();
   if (!repo) throw new Error("Repo not found");
 
-  // Create a pending scan record immediately so the UI can show progress
-  const { data: scan, error: scanErr } = await supabase
+  const { data: scan } = await supabase
     .from("code_scans")
-    .insert({ repo_id: repoId, status: "running" })
+    .insert({ repo_id: repoId, status: "running", scan_type: "general" })
     .select("id")
     .single();
-  if (scanErr) throw new Error(scanErr.message);
+  if (!scan) throw new Error("Failed to create scan record");
 
   try {
     const tree     = await fetchRepoTree(repo.owner_name, repo.repo_name, repo.default_branch);
@@ -103,9 +110,74 @@ export async function runScan(repoId: string): Promise<void> {
       .from("code_repos")
       .update({ last_scanned_at: new Date().toISOString() })
       .eq("id", repoId);
-
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Scan failed";
+    await supabase
+      .from("code_scans")
+      .update({ status: "failed", error: msg, completed_at: new Date().toISOString() })
+      .eq("id", scan.id);
+    throw err;
+  }
+
+  revalidatePath(`/dashboard/code-quality/${repoId}`);
+  revalidatePath("/dashboard/code-quality");
+}
+
+/* ─── Run a Web3 smart contract audit (NEW Week 12) ──────────────────────── */
+export async function runWeb3Audit(repoId: string): Promise<void> {
+  const supabase = createClient();
+
+  const { data: repo } = await supabase
+    .from("code_repos").select("*").eq("id", repoId).single();
+  if (!repo) throw new Error("Repo not found");
+
+  // Create scan record immediately so the UI can show "Running…"
+  const { data: scan } = await supabase
+    .from("code_scans")
+    .insert({ repo_id: repoId, status: "running", scan_type: "web3_smart_contract" })
+    .select("id")
+    .single();
+  if (!scan) throw new Error("Failed to create scan record");
+
+  try {
+    // Fetch ONLY .sol files using the extended fetchRepoTree()
+    const tree     = await fetchRepoTree(repo.owner_name, repo.repo_name, repo.default_branch, SOL_EXTENSIONS);
+    const priority = selectPrioritySolidityFiles(tree, 10);
+    const files    = await fetchFiles(repo.owner_name, repo.repo_name, repo.default_branch, priority);
+
+    if (files.length === 0) {
+      await supabase
+        .from("code_scans")
+        .update({
+          status:       "failed",
+          error:        "No .sol files found in this repository. Make sure this is a Solidity project.",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", scan.id);
+      revalidatePath(`/dashboard/code-quality/${repoId}`);
+      return;
+    }
+
+    const result = await runSmartContractAudit(`${repo.owner_name}/${repo.repo_name}`, files);
+
+    await supabase
+      .from("code_scans")
+      .update({
+        status:        "complete",
+        score:         result.score,
+        summary:       result.summary,
+        findings:      result.findings,
+        files_scanned: files.length,
+        completed_at:  new Date().toISOString(),
+      })
+      .eq("id", scan.id);
+
+    await supabase
+      .from("code_repos")
+      .update({ last_scanned_at: new Date().toISOString() })
+      .eq("id", repoId);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Web3 audit failed";
     await supabase
       .from("code_scans")
       .update({ status: "failed", error: msg, completed_at: new Date().toISOString() })

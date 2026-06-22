@@ -20,6 +20,7 @@ const ORG_NAV = [
   { href: "/dashboard/org/rewards",     icon: Trophy,          label: "Rewards" },
   { href: "/dashboard/ptaas",           icon: Shield,          label: "PTaaS" },
   { href: "/dashboard/code-quality",    icon: Code2,           label: "Code Quality" },
+  { href: "/dashboard/ai-red-team",     icon: Zap,             label: "AI Red Team" },
 ];
 
 const RESEARCHER_NAV = [
@@ -37,9 +38,7 @@ const BOTTOM_NAV = [
   { href: "/dashboard/settings",      icon: Settings, label: "Settings" },
 ];
 
-const STUB_MODULES = [
-  { href: "/dashboard/ai-red-team", icon: Zap,    label: "AI Red Team" },
-];
+const STUB_MODULES: { href: string; icon: any; label: string }[] = [];
 
 interface Props {
   role:      UserRole;
