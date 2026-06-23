@@ -83,8 +83,6 @@ Inside Supabase Console → Authentication → Providers:
 npm run dev
 ```
 
----
-
 ### High-Level Project Structure
 ```
 vaultx/
@@ -94,7 +92,7 @@ vaultx/
 │   │   ├── layout.tsx         # Responsive Sidebar + Navigation
 │   │   └── dashboard/
 │   │       ├── ai-red-team/   # AI Autonomous Scanning Module (Week 11)
-│   │       ├── code-quality/  # Static Code & Smart Contract Audit Console (Week 6/9)
+│   │       ├── code-quality/  # Static Code & Smart Contract Audit Console (Weeks 6/12)
 │   │       ├── org/           # Org-Only Program & Submissions Triage (Weeks 2/5/6)
 │   │       ├── ptaas/         # Pentesting Engagements & Report Gen (Week 10)
 │   │       └── researcher/    # Researcher Dashboard, Submissions, Earnings (Week 3)
@@ -102,16 +100,18 @@ vaultx/
 │   ├── onboarding/            # Profile Onboarding & Role Selection (Org vs Researcher)
 │   └── page.tsx               # Animated Platform Landing Page (Week 8)
 ├── components/
+│   ├── code-quality/          # Solidity Web3AuditButton (Week 12)
 │   ├── layout/                # Sidebar, MobileSidebar, Header Elements
 │   ├── ptaas/                 # EngagementStatusControl, Findings panels
 │   ├── red-team/              # AggressionBadge, ReasoningTrace view components
 │   └── ui/                    # StatCard, CopyButton, Modal Dialogs
 ├── lib/
-│   ├── ai/                    # Multi-Provider Client (claude.ts), Scans & Prompts
+│   ├── ai/                    # Multi-Provider Client (claude.ts), Smart Contract Audit (Week 12)
+│   ├── github/                # Repo file client with Solidity filters (Week 12)
 │   └── supabase/              # Supabase Client, Server, and TS Types
 ├── supabase/
 │   └── migrations/            # SQL Schemas (001_initial.sql to 009_web3_audit.sql)
-├── middleware.ts              # Session Protection & Role-Based Route Guarding
+├── middleware.ts              # Auth protection + role routing
 ├── wrangler.jsonc             # Cloudflare Pages Deployment Configuration
 ├── package.json               # Package Manifest & Scripts
 └── tsconfig.json              # TypeScript Options (excludes backup test paths)
@@ -281,7 +281,7 @@ sequenceDiagram
 4. `submissions`: Researcher vulnerability entries. Includes hash values and AI suggestion classifications.
 5. `rewards`: Proposed payouts. Triggers guarantee that `approved_by` is not null when status is changed to `approved` or `paid`.
 6. `audit_logs`: Immutable database tracking table. Database triggers throw exceptions on any SQL `UPDATE` or `DELETE` commands.
-7. `code_repos` & `code_scans`: Tracks connected public repositories and static evaluation scores.
+7. `code_repos` & `code_scans`: Tracks connected public repositories and static evaluation scores. `code_scans` includes a `scan_type` discriminator (`general` or `web3_smart_contract`) to support Solidity-specific audits.
 8. `pentest_engagements`, `pentest_findings`, & `pentest_reports`: Houses scheduled pentesting engagements, reported logs, and final summary rollups.
 9. `red_team_targets` & `red_team_scans`: Configures AI Red Team scanner targets and reasoning outputs.
 
@@ -309,9 +309,10 @@ sequenceDiagram
 - Set up connected public repository scanners.
 - Design the animated landing pages and register waitlist signups for advanced features.
 
-### Phase 5: Advanced Security Operations (Weeks 10-11)
+### Phase 5: Advanced Security Operations (Weeks 10-12)
 - Deploy the complete PTaaS engagement builder and PDF rollup engine.
 - Establish the AI Autonomous Red Team scanner with thinking traces, and map results to the triage pipeline.
+- Deploy Web3 Smart Contract static analysis audits with Solidity SWC weakness classification.
 - Verify production compilation using strict typechecking.
 
 ---
@@ -380,6 +381,58 @@ System Prompt:
 You are an advanced, autonomous AI Red Team agent scanning a target scope.
 Your goal is to simulate realistic attacker methodology (recon, analysis, exploit planning, execution analysis) and log findings.
 Generate a JSON array of step-by-step thinking traces alongside discovered vulnerability findings.
+```
+
+### Prompt 4: Web3 Smart Contract Static Auditor
+Use this template to audit Solidity smart contracts:
+```
+System Prompt:
+You are a senior smart contract security auditor with expertise in Solidity and EVM-based contracts. You have deep knowledge of the SWC (Smart Contract Weakness Classification) Registry and common DeFi attack patterns.
+
+Perform a security-focused static analysis of the provided Solidity contracts. Think like an attacker: look for exploitable paths, not just code style.
+
+VULNERABILITY CATEGORIES TO CHECK (systematic, in order of typical severity):
+1. Reentrancy (SWC-107) — external calls before state updates, missing CEI pattern
+2. Integer overflow/underflow (SWC-101) — unchecked arithmetic, missing SafeMath or Solidity 0.8+
+3. Access control (SWC-105, SWC-106) — missing onlyOwner/role checks, tx.origin auth, constructor visibility
+4. Oracle manipulation — price oracle reliance on single source, flash loan attack vectors
+5. Front-running (SWC-114) — MEV-exploitable state changes, race conditions in commit-reveal
+6. Denial of Service — block gas limit DoS, unexpected revert in loops, push-over-pull pattern
+7. Timestamp dependence (SWC-116) — block.timestamp in critical logic
+8. Unchecked return values (SWC-104) — low-level call() without return check
+9. Delegatecall risk (SWC-112) — storage layout conflicts in proxy patterns
+10. Hardcoded addresses, self-destruct vectors, insecure randomness (SWC-120)
+
+SCORING:
+- Start at 100.
+- Critical: -25 per finding
+- High: -15 per finding
+- Medium: -8 per finding
+- Low: -3 per finding
+- Info: -0 (notes only, no deduction)
+- Minimum score: 0
+
+Respond ONLY with valid JSON. No preamble, no markdown.
+
+JSON schema:
+{
+  "score": number (0-100),
+  "summary": string,
+  "contractsAnalyzed": string[],
+  "findings": [
+    {
+      "swcId": string | null,
+      "category": string,
+      "title": string,
+      "description": string,
+      "severity": "critical" | "high" | "medium" | "low" | "info",
+      "file": string,
+      "line": number | null,
+      "codeSnippet": string | null,
+      "recommendation": string
+    }
+  ]
+}
 ```
 
 ---
