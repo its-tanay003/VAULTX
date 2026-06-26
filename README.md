@@ -17,6 +17,7 @@ Built with Next.js 14 App Router, Supabase (PostgreSQL with RLS), Cloudflare Pag
 8. [Errors & Mistakes to Avoid](#8-errors--mistakes-to-avoid)
 9. [Improvements & Future Upgrades](#9-improvements--future-upgrades)
 10. [Deployment & Operations Guide (Runbooks, QA, Demo Script, Audits)](#10-deployment--operations-guide)
+11. [Settings System (Week 15)](#11-settings-system)
 
 ---
 
@@ -518,3 +519,18 @@ JSON schema:
 ### Performance & Bundle Audits
 - **Lazy Loading Components**: Dynamic imports (`next/dynamic`) load the Command Palette modal code on-demand. This reduces the initial bundle size of all dashboard routes by ~20KB.
 - **Font & Image Optimization**: Self-hosts typography packages via `next/font` to bypass render-blocking requests. Configured strict domain validation rules in `next.config.ts` to secure image rendering endpoints.
+
+---
+
+## 11. SETTINGS SYSTEM
+
+The settings system provides comprehensive control for personal accounts and organizations. Detailed architectural documentation, database schemas, and server action definitions can be found in [settings_system_architecture.md](file:///C:/Users/hp/.gemini/antigravity-ide/brain/2e6daf62-254d-42d1-bd5b-60ed68d467f6/settings_system_architecture.md).
+
+### Quick Summary of Features
+- **Profile Customization**: Avatar crop uploads linked directly to the Supabase `avatars` Storage bucket.
+- **Security Control**: Password strength enforcement and session revocation tables (OS, IP, agent tracking).
+- **Organization Settings**: Invitation control workflows, membership management, default roles, and required domain signup rules.
+- **API Key Engine**: Dynamic key prefixes and double-hashed API keys for external access.
+- **Status & Integration Tiles**: Connectors for Slack notifications, Resend email deliveries, and GitHub integrations.
+- **Lifecycle Protection**: A verify-first Danger Zone for account deletion or factory resets.
+
