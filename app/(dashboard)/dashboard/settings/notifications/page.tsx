@@ -1,46 +1,97 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect }      from "next/navigation";
-import Link              from "next/link";
-import { ChevronLeft }   from "lucide-react";
-import { NotificationPreferencesForm } from "@/components/settings/notification-preferences-form";
-import type { Metadata } from "next";
+"use client";
 
-export const metadata: Metadata = { title: "Notification Settings" };
+import { useState, useTransition } from "react";
+import { toast }               from "sonner";
+import { Loader2, Save }       from "lucide-react";
+import { updateUserSettings }  from "@/app/actions/settings";
+import { SectionCard, FieldRow, SettingsToggle } from "@/components/settings/section-card";
 
-export default async function NotificationSettingsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+export default function NotificationsSettingsPage() {
+  const [pending, start] = useTransition();
 
-  const { data: prefs } = await supabase
-    .from("notification_preferences")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  const [securityAlerts, setSecurityAlerts]   = useState(true);
+  const [marketingEmails, setMarketingEmails] = useState(true);
+  const [weeklyDigest, setWeeklyDigest]       = useState(false);
+  const [submissionUpdates, setSubmissionUpdates] = useState(true);
+  const [rewardAlerts, setRewardAlerts]           = useState(true);
+  const [programChanges, setProgramChanges]       = useState(true);
+  const [teamActivity, setTeamActivity]           = useState(false);
+  const [slackWebhook, setSlackWebhook] = useState("");
 
-  const defaults = {
-    app_submission_new:      prefs?.app_submission_new      ?? true,
-    app_submission_update:   prefs?.app_submission_update   ?? true,
-    app_reward_update:       prefs?.app_reward_update       ?? true,
-    email_submission_new:    prefs?.email_submission_new    ?? true,
-    email_submission_update: prefs?.email_submission_update ?? true,
-    email_reward_update:     prefs?.email_reward_update     ?? true,
-    email_digest_weekly:     prefs?.email_digest_weekly     ?? false,
-  };
+  function handleSave() {
+    start(async () => {
+      try {
+        await updateUserSettings({
+          security_alerts:   securityAlerts,
+          marketing_emails:  marketingEmails,
+          weekly_digest:     weeklyDigest,
+          slack_webhook_url: slackWebhook || null,
+        });
+        toast.success("Notification preferences saved");
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "Failed to save");
+      }
+    });
+  }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5 animate-in">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard/settings" className="text-vault-muted hover:text-vault-text transition-colors">
-          <ChevronLeft className="w-4 h-4" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-semibold">Notification Settings</h1>
-          <p className="text-sm text-vault-muted">Choose what you want to be notified about</p>
+    <div className="space-y-5 animate-in">
+      <SectionCard title="Email Notifications" description="Control which emails VaultX sends you">
+        <div className="space-y-0">
+          <FieldRow label="Security alerts" description="Login from new device, password changes">
+            <SettingsToggle checked={securityAlerts} onChange={setSecurityAlerts} />
+          </FieldRow>
+          <FieldRow label="Weekly digest" description="Summary of your activity and earnings">
+            <SettingsToggle checked={weeklyDigest} onChange={setWeeklyDigest} />
+          </FieldRow>
+          <FieldRow label="Marketing & announcements" description="Product updates, new features, events">
+            <SettingsToggle checked={marketingEmails} onChange={setMarketingEmails} />
+          </FieldRow>
         </div>
-      </div>
+      </SectionCard>
 
-      <NotificationPreferencesForm initialPrefs={defaults} />
+      <SectionCard title="In-App Notifications" description="Real-time alerts inside the dashboard">
+        <div className="space-y-0">
+          <FieldRow label="Submission status updates" description="When your report status changes">
+            <SettingsToggle checked={submissionUpdates} onChange={setSubmissionUpdates} />
+          </FieldRow>
+          <FieldRow label="Reward payouts" description="When rewards are approved or paid">
+            <SettingsToggle checked={rewardAlerts} onChange={setRewardAlerts} />
+          </FieldRow>
+          <FieldRow label="Program changes" description="New programs, scope changes, pauses">
+            <SettingsToggle checked={programChanges} onChange={setProgramChanges} />
+          </FieldRow>
+          <FieldRow label="Team activity" description="New team members, org events">
+            <SettingsToggle checked={teamActivity} onChange={setTeamActivity} />
+          </FieldRow>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Slack Notifications" description="Forward alerts to a personal Slack channel">
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium mb-1.5 text-vault-muted">Incoming Webhook URL</label>
+            <input
+              value={slackWebhook}
+              onChange={(e) => setSlackWebhook(e.target.value)}
+              placeholder="https://hooks.slack.com/services/..."
+              className="vault-input w-full font-mono text-xs"
+            />
+            <p className="text-[10px] text-vault-muted mt-1">
+              Create one at{" "}
+              <a href="https://api.slack.com/incoming-webhooks" target="_blank" rel="noopener noreferrer" className="text-vault-teal hover:underline">
+                api.slack.com/incoming-webhooks
+              </a>
+            </p>
+          </div>
+        </div>
+      </SectionCard>
+
+      <div className="flex justify-end">
+        <button onClick={handleSave} disabled={pending} className="btn-teal flex items-center gap-2 disabled:opacity-40">
+          {pending ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save preferences</>}
+        </button>
+      </div>
     </div>
   );
 }
