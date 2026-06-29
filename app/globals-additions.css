@@ -1,0 +1,191 @@
+/* ════════════════════════════════════════════════════════════════════════
+   VAULTX Polish Sprint — globals.css additions
+   APPEND these blocks to your existing app/globals.css
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Smooth scroll platform-wide ───────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Prevent content jump when scrollbar appears/disappears ─────────────────── */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* ── Custom scrollbar (consistent across all pages) ─────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* ── Focus rings — keyboard navigation must be visible ───────────────────────── */
+*:focus-visible {
+  outline: 2px solid rgba(45, 212, 191, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Disabled state — consistent across all interactive elements ─────────────── */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* ── vault-input — standardized, previously had slight inconsistencies ──────── */
+.vault-input {
+  @apply w-full bg-vault-elevated border border-vault-border rounded-lg px-3 py-2.5 text-sm
+         text-vault-text placeholder:text-vault-muted
+         focus:outline-none focus:border-vault-teal/50 focus:ring-1 focus:ring-vault-teal/20
+         transition-colors duration-150;
+}
+
+.vault-input:hover:not(:focus):not(:disabled) {
+  @apply border-vault-border-bright;
+}
+
+/* ── nav-item — standardized (previously had minor padding inconsistencies) ──── */
+.nav-item {
+  @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm
+         text-vault-muted hover:text-vault-text hover:bg-vault-elevated
+         transition-colors duration-100 cursor-pointer w-full;
+}
+
+.nav-item.active {
+  @apply text-vault-teal bg-vault-teal/[0.08] border border-vault-border;
+}
+
+/* ── btn-teal — consistent loading + disabled state ─────────────────────────── */
+.btn-teal {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+         bg-vault-teal text-vault-bg text-sm font-semibold
+         hover:bg-vault-teal/90 active:scale-[0.98]
+         transition-all duration-150
+         disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
+}
+
+/* ── btn-ghost ───────────────────────────────────────────────────────────────── */
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+         text-sm font-medium text-vault-muted
+         border border-vault-border bg-vault-elevated
+         hover:text-vault-text hover:border-vault-border-bright
+         active:scale-[0.98]
+         transition-all duration-150
+         disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+/* ── vault-card — standardized (was slightly different in weeks 10-14) ──────── */
+.vault-card {
+  @apply bg-vault-surface border border-vault-border rounded-xl;
+}
+
+/* ── field-label — standardized ─────────────────────────────────────────────── */
+.field-label {
+  @apply text-sm font-medium text-vault-text;
+}
+
+/* ── animate-in — standardized page entrance (applied to max-w container) ───── */
+@keyframes vault-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.animate-in {
+  animation: vault-fade-up 0.2s ease-out forwards;
+}
+
+/* ── Skeleton shimmer — consistent across all weeks ─────────────────────────── */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #18181b 25%,
+    #27272a 50%,
+    #18181b 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.375rem;
+}
+
+/* ── Toast z-index — always above modals ─────────────────────────────────────── */
+[data-sonner-toaster] {
+  z-index: 200 !important;
+}
+
+/* ── Reduce motion — respect user preference ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .skeleton {
+    animation: none;
+    background: #18181b;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ── Typography consistency ──────────────────────────────────────────────────── */
+h1, h2, h3, h4 {
+  @apply tracking-tight;
+}
+
+p {
+  @apply leading-relaxed;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-geist-mono), 'Courier New', monospace;
+}
+
+/* ── Mobile padding fix — main content area ──────────────────────────────────── */
+@media (max-width: 640px) {
+  main {
+    padding: 1rem !important;
+  }
+}
+
+/* ── Table overflow — prevents horizontal blowout on data-heavy pages ───────── */
+table {
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+}
+
+/* ── Light theme overrides (Week 7 — ensure these are still present) ─────────── */
+.light .skeleton {
+  background: linear-gradient(90deg, #f0f0f1 25%, #e4e4e7 50%, #f0f0f1 75%);
+  background-size: 200% 100%;
+}
+
+.light .vault-card {
+  @apply bg-white border-zinc-200;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.light .nav-item.active {
+  @apply bg-teal-50 border-teal-200 text-teal-700;
+}

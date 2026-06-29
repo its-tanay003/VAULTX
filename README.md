@@ -93,24 +93,46 @@ vaultx/
 │   │   ├── layout.tsx         # Responsive Sidebar + Navigation
 │   │   └── dashboard/
 │   │       ├── ctf/           # Capture The Flag Competition Board (Week 13)
+│   │       │   ├── loading.tsx               # CTF List Loader [NEW]
+│   │       │   └── [id]/
+│   │       │       ├── loading.tsx           # CTF Info Loader [NEW]
+│   │       │       └── play/
+│   │       │           └── loading.tsx       # CTF Challenge Console Loader [NEW]
 │   │       ├── contests/      # Code4rena-Style Audit Contests Board (Week 14)
+│   │       │   ├── loading.tsx               # Contests List Loader [NEW]
+│   │       │   └── [id]/
+│   │       │       ├── loading.tsx           # Contest Console Loader [NEW]
+│   │       │       └── judge/
+│   │       │           └── loading.tsx       # Judge Dashboard Loader [NEW]
 │   │       ├── ai-red-team/   # AI Autonomous Scanning Module (Week 11)
+│   │       │   ├── loading.tsx               # Red Team Scans List Loader [NEW]
+│   │       │   └── [id]/
+│   │       │       └── loading.tsx           # Scan Progress & Thinking Logs Loader [NEW]
 │   │       ├── code-quality/  # Static Code & Smart Contract Audit Console (Weeks 6/12)
 │   │       ├── org/           # Org-Only Program & Submissions Triage (Weeks 2/5/6)
 │   │       ├── ptaas/         # Pentesting Engagements & Report Gen (Week 10)
+│   │       │   ├── loading.tsx               # Engagements List Loader [NEW]
+│   │       │   └── [id]/
+│   │       │       └── loading.tsx           # Report Dashboard & Document Loader [NEW]
 │   │       └── researcher/    # Researcher Dashboard, Submissions, Earnings (Week 3)
 │   ├── auth/callback/         # Supabase Auth Callback Route
 │   ├── onboarding/            # Profile Onboarding & Role Selection (Org vs Researcher)
 │   └── page.tsx               # Animated Platform Landing Page (Week 8)
 ├── components/
+│   ├── command/               # CommandPalette component (⌘K quick navigation, Week 8)
 │   ├── ctf/                   # Competition panels, Timers, Flag Submitters (Week 13)
 │   ├── contests/              # Duplicate Panels, Status controls, Payout tables (Week 14)
 │   ├── code-quality/          # Solidity Web3AuditButton (Week 12)
+│   ├── feedback/
+│   │   └── loading-states.tsx # Skeleton loading state block reference code
 │   ├── layout/                # Sidebar, MobileSidebar, Header Elements
+│   ├── providers/             # Client context wrappers, CommandPaletteProvider (dynamic lazy-loading)
 │   ├── ptaas/                 # EngagementStatusControl, Findings panels
 │   ├── red-team/              # AggressionBadge, ReasoningTrace view components
-│   └── ui/                    # StatCard, CopyButton, Modal Dialogs
+│   └── ui/                    # StatCard, CopyButton, Modal Dialogs, skip-to-content.tsx, badge.tsx [NEW], form.tsx [NEW], page-header.tsx [NEW]
 ├── lib/
+│   ├── design-system.ts       # Unified Design tokens [NEW]
+│   ├── use-form-error.ts      # Custom form validation hooks [NEW]
 │   ├── ai/                    # Multi-Provider (claude.ts), Smart Contract Audit (Week 12), Contest Judge/Distribution (Week 14)
 │   ├── github/                # Repo file client with Solidity filters (Week 12)
 │   └── supabase/              # Supabase Client, Server, and TS Types
@@ -482,10 +504,10 @@ JSON schema:
 
 ### Production Deployment Runbook
 1. **Host Configuration**: Register a project in Cloudflare Pages. Point the build settings to:
-   - Framework preset: `Next.js`
+   - Framework preset: `Next.js` (compiled for Cloudflare Workers/Pages V8 isolate environment via Wrangler)
    - Build command: `npm run build`
    - Build output: `.next`
-   - Environment Variable: Add `NODE_VERSION` set to `20`.
+   - Compatibility setup: Wrangler uses `wrangler.jsonc` to inject the V8-compatible Node.js standard libraries polyfill (`nodejs_compat` compatibility flag) directly into the edge sandbox. Native Node.js filesystem modules (like `fs`) cannot be resolved.
 2. **Domain Mapping**: Attach your custom domain in the Pages panel. Universal SSL will auto-provision. Ensure `NEXT_PUBLIC_APP_URL` matches this domain exactly.
 3. **Database Sanity Verification**: Run this query inside the Supabase SQL editor to ensure Row-Level Security is active on all public tables:
    ```sql
@@ -495,6 +517,23 @@ JSON schema:
 4. **Active Uptime Checking**: Configure monitors on UptimeRobot for:
    - Dashboard index page: `https://your-domain.com`
    - AI API endpoint: `https://your-domain.com/api/ai/validate-submission`
+5. **Email Domain Configuration**: Configure sending domains in Resend (or your chosen provider) to ensure reliable Magic Link authentication delivery:
+   - *SPF (TXT record)*: Add `v=spf1 include:providers.resend.com ~all` on your sending subdomain/domain.
+   - *DKIM (CNAME records)*: Map the three dynamic CNAME records provided in the Resend console (e.g. `resend1._domainkey` pointing to `dkim1.resend.com`).
+   - *DMARC (TXT record)*: Setup `_dmarc` with a quarantine monitoring policy: `v=DMARC1; p=quarantine; pct=100;`.
+   - Verify active status in the provider domains panel before launching user access.
+6. **Attachment Storage Configuration**: Configure secure private attachment storage for submission evidence:
+   - Run the migration file `supabase/migrations/013_attachments.sql` in the Supabase SQL Editor.
+   - This creates a private `attachments` bucket with a 10MB size limit and allowed safe MIME types (`image/*`, `application/pdf`, `.json`, `.txt`).
+   - Row-level security (RLS) policies are automatically configured to restrict access to the file owner (researcher) and the program owner (organization members).
+7. **Push Notifications Configuration (Coming Soon)**: Real-time In-App push notifications are currently in a "Coming Soon" development phase. The frontend toggle controls are disabled to prevent broken user expectations. Enabling this in the future requires VAPID key generation (`web-push` CLI), service worker registration script imports, FCM project keys, and database push subscription storage configurations.
+8. **Retry and Backoff Configuration (Cloudflare Safe)**: To comply with Cloudflare Workers' 30-second hard execution limits, VAULTX enforces bounded retry parameters on all third-party API clients. Ensure the primary AI client (`lib/ai/claude.ts`) and any new endpoints maintain:
+   - Maximum retry attempt cap set to `1` (plus initial try).
+   - Single-request fetch timeout bound to `10s` (using AbortControllers).
+   - Flat/exponential backoff delays capped at `500ms`.
+   - Capping total serial request durations under `25s` to provide a safety margin before Cloudflare 524 timeouts occur.
+9. **Multi-AI Normalization & Schema Reliability**: The fallback client parses external structures defensively. API versions are strictly pinned (`anthropic-version` header for Claude, `/v1beta/` resource URL for Gemini). If you update endpoints or models, verify that the parsed response matches the `AIMessage` contract structure, and test failover paths locally before deploying changes.
+10. **AI Output Validation & JSON Safety**: All AI modules generating structured data (e.g. PTaaS test plans or vulnerability summaries) parse responses defensively. Enclose JSON decoding logic in `try-catch` structures. Validate the parsed payloads against typed schemas (e.g. using Zod) before database storage. If parsing fails, fall back to predefined placeholder templates to prevent server crashes.
 
 ### Smoke Testing Walkthrough
 - Navigate to the production URL in an incognito window.

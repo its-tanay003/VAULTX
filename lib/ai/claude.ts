@@ -57,13 +57,28 @@ const GEMINI_MODEL = "gemini-2.0-flash";
 const GEMINI_API = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const MAX_TOKENS  = 1024;
-const MAX_RETRIES = 2;
+const MAX_RETRIES = 1; // Reduced to 1 to bound latency
+const CALL_TIMEOUT_MS = 10000; // 10s hard timeout
 
 interface CallOptions {
   system:       string;
   user:         string;
   maxTokens?:   number;
   temperature?: number;
+}
+
+/** Helper to fetch with an absolute timeout */
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
 }
 
 /** Which provider actually served a given response — useful for logging/audit, optional for callers to read */
@@ -108,10 +123,10 @@ async function callAnthropic(opts: CallOptions): Promise<AIMessage> {
   let lastErr: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 1000 * attempt));
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 500 * attempt)); // Reduced backoff
 
     try {
-      const res = await fetch(ANTHROPIC_API, {
+      const res = await fetchWithTimeout(ANTHROPIC_API, {
         method:  "POST",
         headers: {
           "Content-Type":      "application/json",
@@ -119,7 +134,7 @@ async function callAnthropic(opts: CallOptions): Promise<AIMessage> {
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify(body),
-      });
+      }, CALL_TIMEOUT_MS);
 
       if (res.status === 429) { lastErr = new Error("Claude API rate limited"); continue; }
 
@@ -153,11 +168,11 @@ async function callGemini(opts: CallOptions): Promise<AIMessage> {
     },
   };
 
-  const res = await fetch(`${GEMINI_API}?key=${apiKey}`, {
+  const res = await fetchWithTimeout(`${GEMINI_API}?key=${apiKey}`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(body),
-  });
+  }, CALL_TIMEOUT_MS);
 
   if (!res.ok) {
     const errText = await res.text().catch(() => res.statusText);

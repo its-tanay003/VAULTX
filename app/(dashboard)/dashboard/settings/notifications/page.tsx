@@ -50,19 +50,22 @@ export default function NotificationsSettingsPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="In-App Notifications" description="Real-time alerts inside the dashboard">
-        <div className="space-y-0">
+      <SectionCard 
+        title="In-App Notifications (Coming Soon)" 
+        description="Real-time alerts inside the dashboard (Currently in development)"
+      >
+        <div className="space-y-0 opacity-50 pointer-events-none">
           <FieldRow label="Submission status updates" description="When your report status changes">
-            <SettingsToggle checked={submissionUpdates} onChange={setSubmissionUpdates} />
+            <SettingsToggle checked={submissionUpdates} onChange={setSubmissionUpdates} disabled={true} />
           </FieldRow>
           <FieldRow label="Reward payouts" description="When rewards are approved or paid">
-            <SettingsToggle checked={rewardAlerts} onChange={setRewardAlerts} />
+            <SettingsToggle checked={rewardAlerts} onChange={setRewardAlerts} disabled={true} />
           </FieldRow>
           <FieldRow label="Program changes" description="New programs, scope changes, pauses">
-            <SettingsToggle checked={programChanges} onChange={setProgramChanges} />
+            <SettingsToggle checked={programChanges} onChange={setProgramChanges} disabled={true} />
           </FieldRow>
           <FieldRow label="Team activity" description="New team members, org events">
-            <SettingsToggle checked={teamActivity} onChange={setTeamActivity} />
+            <SettingsToggle checked={teamActivity} onChange={setTeamActivity} disabled={true} />
           </FieldRow>
         </div>
       </SectionCard>
