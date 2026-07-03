@@ -293,7 +293,7 @@ export default function OrganizationSettingsPage() {
 
       {/* Integrations */}
       <SectionCard title="Organization Integrations" description="Connect tools used across your security team">
-        <div className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleSaveIntegrations(); }} className="space-y-4">
           <div>
             <label className="flex text-xs font-medium mb-1.5 text-vault-muted items-center gap-1">
               <Webhook className="w-3 h-3" /> Webhook URL
@@ -307,21 +307,21 @@ export default function OrganizationSettingsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium mb-1.5 text-vault-muted">Jira URL</label>
-              <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder="https://yourorg.atlassian.net" className="vault-input w-full text-xs" />
+              <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder="https://yourorg.atlassian.net" autoComplete="off" className="vault-input w-full text-xs" />
             </div>
             <div>
               <label className="block text-xs font-medium mb-1.5 text-vault-muted">Jira Project Key</label>
-              <input value={jiraProject} onChange={(e) => setJiraProject(e.target.value)} placeholder="SEC" className="vault-input w-full text-xs" />
+              <input value={jiraProject} onChange={(e) => setJiraProject(e.target.value)} placeholder="SEC" autoComplete="off" className="vault-input w-full text-xs" />
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium mb-1.5 text-vault-muted">Jira API Token</label>
-            <input value={jiraToken} onChange={(e) => setJiraToken(e.target.value)} type="password" placeholder="Your Jira API token" className="vault-input w-full font-mono text-xs" />
+            <input value={jiraToken} onChange={(e) => setJiraToken(e.target.value)} type="password" placeholder="Your Jira API token" autoComplete="current-password" className="vault-input w-full font-mono text-xs" />
           </div>
-          <button onClick={handleSaveIntegrations} disabled={pending} className="btn-teal flex items-center gap-2 disabled:opacity-40">
+          <button type="submit" disabled={pending} className="btn-teal flex items-center gap-2 disabled:opacity-40">
             {pending ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save integrations</>}
           </button>
-        </div>
+        </form>
       </SectionCard>
 
       {/* Billing */}

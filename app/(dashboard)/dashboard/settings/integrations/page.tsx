@@ -127,13 +127,14 @@ export default function IntegrationsPage() {
             connectedInfo={jiraConnected ? `Connected to ${jiraUrl}` : undefined}
             onDisconnect={disconnectJira}
             configSlot={
-              <div className="space-y-2">
+              <form onSubmit={(e) => { e.preventDefault(); saveJira(); }} className="space-y-2">
                 <div>
                   <label className="block text-xs font-medium mb-1 text-vault-muted">Jira URL</label>
                   <input
                     value={jiraUrl}
                     onChange={(e) => setJiraUrl(e.target.value)}
                     placeholder="https://yourorg.atlassian.net"
+                    autoComplete="off"
                     className="vault-input w-full text-xs"
                   />
                 </div>
@@ -144,14 +145,15 @@ export default function IntegrationsPage() {
                     onChange={(e) => setJiraToken(e.target.value)}
                     type="password"
                     placeholder="Your Jira API token"
+                    autoComplete="current-password"
                     className="vault-input w-full text-xs font-mono"
                   />
                 </div>
-                <button onClick={saveJira} disabled={pending} className="btn-teal text-xs flex items-center gap-1 disabled:opacity-40">
+                <button type="submit" disabled={pending} className="btn-teal text-xs flex items-center gap-1 disabled:opacity-40">
                   {pending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                   Save & Connect
                 </button>
-              </div>
+              </form>
             }
           />
 

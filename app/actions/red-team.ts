@@ -57,28 +57,34 @@ export async function createTarget(formData: FormData) {
 }
 
 /* ─── Manually trigger a scan ─────────────────────────────────────────────── */
-export async function triggerScan(targetId: string): Promise<void> {
+export async function triggerScan(targetId: string): Promise<{ success: boolean; error?: string }> {
   // EXPLICIT ownership check required here — runRedTeamScan() uses the
   // admin client internally (see lib/ai/red-team.ts header comment) and
   // bypasses RLS entirely. This action is the authorization boundary.
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
 
-  const { data: target } = await supabase
-    .from("red_team_targets")
-    .select("org_id, organizations(owner_id)")
-    .eq("id", targetId)
-    .single();
+    const { data: target } = await supabase
+      .from("red_team_targets")
+      .select("org_id, organizations(owner_id)")
+      .eq("id", targetId)
+      .single();
 
-  const org = Array.isArray(target?.organizations) ? target.organizations[0] : target?.organizations;
-  if (!target || org?.owner_id !== user.id) {
-    throw new Error("Access denied — you don't own this target");
+    const org = Array.isArray(target?.organizations) ? target.organizations[0] : target?.organizations;
+    if (!target || org?.owner_id !== user.id) {
+      throw new Error("Access denied — you don't own this target");
+    }
+
+    await runRedTeamScan(targetId);
+    revalidatePath(`/dashboard/ai-red-team/${targetId}`);
+    revalidatePath("/dashboard/ai-red-team");
+    return { success: true };
+  } catch (err: unknown) {
+    console.error("[RedTeam Action] triggerScan failed:", err);
+    return { success: false, error: err instanceof Error ? err.message : "Failed to run scan" };
   }
-
-  await runRedTeamScan(targetId);
-  revalidatePath(`/dashboard/ai-red-team/${targetId}`);
-  revalidatePath("/dashboard/ai-red-team");
 }
 
 /* ─── Toggle target active/inactive (pauses scheduled scans) ─────────────── */

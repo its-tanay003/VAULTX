@@ -12,8 +12,12 @@ export function RunScanButton({ targetId, isRunning }: { targetId: string; isRun
   function handleRun() {
     start(async () => {
       try {
-        await triggerScan(targetId);
-        toast.success("Scan complete");
+        const res = await triggerScan(targetId);
+        if (res.error) {
+          toast.error(res.error);
+        } else {
+          toast.success("Scan complete");
+        }
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : "Scan failed");
       }
