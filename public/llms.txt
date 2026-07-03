@@ -1,0 +1,20 @@
+# VAULTX LLMs Context File
+
+Welcome to VAULTX. This file provides high-level system context for Large Language Models (LLMs) interacting with the platform codebase.
+
+## System Architecture
+VAULTX is a unified security management and triage platform built on Next.js 14, Supabase (Postgres RLS), and Cloudflare Pages.
+
+- **Frontend**: Tailwind CSS, Framer Motion, and Geist Sans.
+- **Backend / Edge Functions**: Server actions and Next.js Route handlers deployed on Cloudflare Pages.
+- **AI Triage**: Fallback client supporting Anthropic Claude (primary) and Google Gemini (failover).
+
+## Public Route Scopes
+- `/` - Marketing Landing Page
+- `/login` - Researcher/Org Authentication
+- `/onboarding` - First-time user profile registration
+
+## Dashboard Console Scopes
+- `/dashboard/org` - Organization metrics, programs management, and triage boards.
+- `/dashboard/researcher` - Researcher metrics, leaderboard rankings, and submission panels.
+- `/dashboard/settings` - Accounts settings, dynamic API keys, and Slack/GitHub integration tiles.

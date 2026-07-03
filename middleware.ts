@@ -69,6 +69,28 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(onboardUrl);
     }
 
+    // Enforce MFA if organization settings require it
+    const { data: membership } = await supabase
+      .from("memberships")
+      .select("org_id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (membership?.org_id) {
+      const { data: orgSettings } = await supabase
+        .from("org_settings")
+        .select("require_mfa")
+        .eq("org_id", membership.org_id)
+        .single();
+
+      if (orgSettings?.require_mfa) {
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aal?.currentLevel !== "aal2") {
+          return NextResponse.redirect(new URL("/auth/mfa-challenge", request.url));
+        }
+      }
+    }
+
     // Role-based redirect: /dashboard → correct dashboard
     if (pathname === "/dashboard" && profile) {
       const roleUrl = request.nextUrl.clone();

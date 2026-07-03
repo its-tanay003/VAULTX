@@ -334,6 +334,15 @@ function ScanResultPanel({
                       <span className="flex items-center gap-1 text-[10px] text-vault-muted">
                         {CATEGORY_ICONS[f.category] ?? null} {f.category}
                       </span>
+                      {f.source && (
+                        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${
+                          f.source === "static"
+                            ? "text-teal-400 bg-teal-950/30 border-teal-900/40"
+                            : "text-violet-400 bg-violet-950/30 border-violet-900/40"
+                        }`}>
+                          {f.source === "static" ? "Static" : "AI"}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-vault-text leading-relaxed">{f.message}</p>
                     <p className="text-xs text-vault-muted font-mono mt-1.5">

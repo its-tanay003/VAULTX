@@ -4,12 +4,16 @@
  * Reuses the Week 4 Claude client. Same injection-protection pattern:
  * all file content is wrapped in [DATA] blocks before being sent.
  *
- * This is intentionally lightweight — a real anti-pattern/perf engine is
- * post-MVP. This module proves the concept: AI-assisted code review wired
- * into the same security platform that triages vulnerability reports.
+ * Two independent passes feed into one result:
+ *   1. AI review (this file's `callClaude` call) — security, performance,
+ *      and quality issues that need contextual judgment.
+ *   2. Static anti-pattern detection (lib/ai/anti-patterns.ts) — god
+ *      objects, deep nesting, duplication, debug leftovers. Deterministic,
+ *      zero AI cost, and runs even if the AI call fails outright.
  */
 
 import { callClaude, parseJsonResponse } from "@/lib/ai/claude";
+import { detectAntiPatterns } from "@/lib/ai/anti-patterns";
 import type { RepoFile } from "@/lib/github/client";
 
 export interface CodeFinding {
@@ -17,6 +21,7 @@ export interface CodeFinding {
   line:     number | null;
   severity: "critical" | "high" | "medium" | "low" | "info";
   category: "security" | "performance" | "quality" | "anti-pattern";
+  source?:  "ai" | "static"; // "ai" is the default/legacy value for existing scan records without this field
   message:  string;
 }
 
@@ -47,7 +52,8 @@ Review the provided source files for:
 - Security issues: hardcoded secrets/credentials, SQL injection risk, missing input validation, insecure crypto, auth bypass risk
 - Performance anti-patterns: N+1 queries, blocking I/O in hot paths, unbounded loops, memory leaks
 - Code quality issues: missing error handling, dead code, overly complex functions
-- Anti-patterns: god objects, tight coupling, magic numbers, copy-pasted logic
+
+Do NOT report structural anti-patterns like god objects, deep nesting, long parameter lists, duplicated code blocks, or debug leftovers (console.log/debugger) — a separate deterministic static analysis pass already covers those categories exhaustively. Focus your judgment on issues that require understanding intent and context, which pattern-matching can't catch.
 
 Respond ONLY with valid JSON. No preamble, no markdown.
 
@@ -60,7 +66,7 @@ JSON schema:
       "file": string (exact file path as given),
       "line": number | null (best estimate, null if not line-specific),
       "severity": "critical" | "high" | "medium" | "low" | "info",
-      "category": "security" | "performance" | "quality" | "anti-pattern",
+      "category": "security" | "performance" | "quality",
       "message": string (max 150 chars, specific and actionable)
     }
   ]
@@ -79,19 +85,44 @@ ${wrapUserData(fileBlock)}
 
 Return JSON code quality assessment.`;
 
-  const message = await callClaude({
-    system,
-    user,
-    maxTokens:   2048,
-    temperature: 0.1,
-  });
+  // Static anti-pattern pass — deterministic, zero AI cost, computed first
+  // so it's guaranteed to be available even if the AI call below fails
+  // outright (both Claude and the Gemini fallback erroring).
+  const antiPatternFindings = detectAntiPatterns(files);
 
-  const parsed = parseJsonResponse<ScanResult>(message);
+  let aiFindings: CodeFinding[] = [];
+  let aiScore = 70; // neutral fallback score when AI review is unavailable
+  let summary = "AI review unavailable — showing static anti-pattern findings only.";
 
-  // Validate and clamp
+  try {
+    const message = await callClaude({
+      system,
+      user,
+      maxTokens:   2048,
+      temperature: 0.1,
+    });
+
+    const parsed = parseJsonResponse<ScanResult>(message);
+    aiFindings = (Array.isArray(parsed.findings) ? parsed.findings.slice(0, 10) : [])
+      .map((f) => ({ ...f, source: "ai" as const }));
+    aiScore = Math.min(100, Math.max(0, Math.round(parsed.score ?? 0)));
+    summary = parsed.summary ?? "Scan completed.";
+  } catch (err: unknown) {
+    console.error("[CodeReview] AI pass failed, falling back to static-only results:", err);
+  }
+
+  // Small deduction for structural anti-patterns, same weighting scheme as
+  // the Web3 auditor (severity-scaled, capped so anti-patterns alone can't
+  // zero out an otherwise healthy scan).
+  const antiPatternPenalty = antiPatternFindings.reduce((sum, f) => {
+    const weight = { critical: 8, high: 5, medium: 3, low: 1, info: 0 }[f.severity] ?? 0;
+    return sum + weight;
+  }, 0);
+  const finalScore = Math.max(0, aiScore - Math.min(20, antiPatternPenalty));
+
   return {
-    score:    Math.min(100, Math.max(0, Math.round(parsed.score ?? 0))),
-    summary:  parsed.summary ?? "Scan completed.",
-    findings: Array.isArray(parsed.findings) ? parsed.findings.slice(0, 10) : [],
+    score:    finalScore,
+    summary,
+    findings: [...aiFindings, ...antiPatternFindings],
   };
 }

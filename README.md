@@ -1,12 +1,13 @@
 # VAULTX — Unified Security Intelligence Platform
 
-An AI-first, zero-infrastructure-cost cybersecurity and code intelligence platform. VAULTX unifies bug bounty programs, Vulnerability Disclosure Programs (VDP), penetration testing (PTaaS), code quality scanning, Web3 smart contract auditing, autonomous AI Red Teaming, Capture The Flag (CTF) competitions, and Code4rena-Style Audit Contests into a single dashboard. 
+An AI-first, zero-infrastructure-cost cybersecurity and code intelligence platform. VAULTX unifies bug bounty programs, Vulnerability Disclosure Programs (VDP), penetration testing (PTaaS), code quality scanning, Web3 smart contract auditing, autonomous AI Red Teaming, Capture The Flag (CTF) competitions, and Code4rena-Style Audit Contests into a single dashboard.
 
 Built with Next.js 14 App Router, Supabase (PostgreSQL with RLS), Cloudflare Pages, Upstash Redis, Resend, and a resilient Multi-Provider AI Fallback Engine (Claude Sonnet + Gemini Flash).
 
 ---
 
 ## 📖 TABLE OF CONTENTS
+
 1. [README (Top Section)](#1-readme-top-section)
 2. [Final Platform Definition](#2-final-platform-definition)
 3. [Complete Feature & Function System](#3-complete-feature--function-system)
@@ -24,19 +25,21 @@ Built with Next.js 14 App Router, Supabase (PostgreSQL with RLS), Cloudflare Pag
 ## 1. README (TOP SECTION)
 
 ### Tech Philosophy
+
 - **AI-First Integration**: Rather than acting as a simple text editor wrapper, VAULTX embeds AI directly into data ingestion pipelines to deduplicate findings, classify severities, draft test plans, perform code quality audits, and execute autonomous red-team scans.
 - **Multi-AI Fallback Orchestration**: Standardizes on Anthropic's Claude Sonnet as the primary engine for high-logic security tasks. If Claude API calls time out, error, or hit rate limits, the engine transparently falls back to Google Gemini Flash.
 - **Zero-Cost Production Stack**: Leverages free tiers to run a production-ready SaaS enterprise:
-  - *Compute*: Cloudflare Pages edge hosting (Unlimited bandwidth & requests on free tier).
-  - *Data & Realtime*: Supabase Free Tier (500MB DB, 1GB Storage, 50K MAUs, Realtime WebSockets).
-  - *Cache & Rate Limiting*: Upstash Redis (10K requests/day free).
-  - *Notifications*: Resend (3,000 emails/month free).
-  - *AI Fallback*: Google AI Studio Gemini API (free tier limits).
+  - _Compute_: Cloudflare Pages edge hosting (Unlimited bandwidth & requests on free tier).
+  - _Data & Realtime_: Supabase Free Tier (500MB DB, 1GB Storage, 50K MAUs, Realtime WebSockets).
+  - _Cache & Rate Limiting_: Upstash Redis (10K requests/day free).
+  - _Notifications_: Resend (3,000 emails/month free).
+  - _AI Fallback_: Google AI Studio Gemini API (free tier limits).
 - **Human-in-the-Loop Security (Hard Invariants)**: Database level constraints guarantee that AI suggestions cannot execute financial actions, alter core configuration, or delete records.
 
 ### Quick Start / Developer Setup
 
 #### 1. Clone & Install Dependencies
+
 ```bash
 git clone https://github.com/its-tanay003/VAULTX.git
 cd vaultx
@@ -44,22 +47,27 @@ npm install
 ```
 
 #### 2. Configure Database (Supabase)
+
 1. Register a project at [supabase.com](https://supabase.com).
 2. Grab the API configuration details (Project URL, `anon` public key, and `service_role` private key).
 3. Apply migrations in order against the remote DB.
-   - *Option A (CLI)*:
+   - _Option A (CLI)_:
      ```bash
      npx supabase login
      npx supabase db push --db-url postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT.supabase.co:5432/postgres
      ```
-   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `011_audit_contests.sql` sequentially inside the Supabase SQL Editor.
+   - _Option B (Direct Panel)_: Paste migrations `001_initial.sql` through `014_push_notifications.sql` sequentially inside the Supabase SQL Editor.
 
 #### 3. Setup Environment Variables
+
 Create `.env.local` based on `.env.example`:
+
 ```bash
 cp .env.example .env.local
 ```
+
 Fill in the following:
+
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
@@ -75,17 +83,21 @@ UPSTASH_REDIS_REST_TOKEN=...
 ```
 
 #### 4. Configure Authentication Providers
+
 Inside Supabase Console → Authentication → Providers:
+
 - **Email**: Enable, toggle **Magic link** on.
 - **Google OAuth**: Enable, specify Client ID and Client Secret generated in Google Cloud Console. Set Redirect URL to `http://localhost:3000/auth/callback`.
 
 #### 5. Local Dev Execution
+
 ```bash
 npm run dev
 ```
 
 ### High-Level Project Structure
-```
+
+```text
 vaultx/
 ├── app/
 │   ├── (auth)/login/          # Login Page (Magic Link + Google OAuth)
@@ -149,6 +161,7 @@ vaultx/
 ## 2. FINAL PLATFORM DEFINITION
 
 ### What the Platform Does
+
 - **Unified Security Triage**: Ingests open bug bounty and VDP submissions, runs automatic multi-engine deduplication, assesses severity, and displays findings.
 - **Code Auditing (Web2 & Web3)**: Scans public GitHub repositories for OWASP Top 10 vulnerabilities, code quality smells, and Solidity gas/reentrancy patterns.
 - **PTaaS Lifecycle Management**: Schedules time-boxed pentests, generates test plans, tracks finding states, and compiles executive summaries.
@@ -156,6 +169,7 @@ vaultx/
 - **Role-based Authentication**: Keeps Org data isolated, Researchers restricted to their submissions/leaderboard, and Triagers focused on review.
 
 ### What the Platform Does NOT Do
+
 - **Auto-Payment Execution**: Suggests reward payouts, but restricts actual balance transfers or transaction signatures to human authorization.
 - **Full Git Hosting**: Integrates with GitHub via API, but does not duplicate or store private repository codebases on disk.
 - **Vulnerability Auto-Patching**: Locates flaws, but does not commit auto-generated pull requests directly to master branches.
@@ -169,59 +183,68 @@ graph TD
     A[VAULTX Platform] --> B[Org Console]
     A --> C[Researcher Portal]
     A --> D[AI Engines]
-    
+
     B --> B1[Program Manager]
     B --> B2[Submissions Triager]
     B --> B3[PTaaS Coordinator]
-    
+
     C --> C1[VDP / Bug Bounty Submissions]
     C --> C2[Code Quality Scans]
     C --> C3[Leaderboard & Reputation]
-    
+
     D --> D1[Submission Validator]
     D --> D2[Code & Web3 Audit]
     D --> D3[Red Team Scanner]
 ```
 
 ### Module 1: Organization Dashboard & Program Management
-* **Program Setup Wizard**: Form to configure VDP or Bug Bounty scope (in-scope, out-of-scope arrays, rewards, timelines).
-* **Triage Worklist**: Visual board tracking reports. Supports moving reports through states (`new` → `triaging` → `accepted` / `duplicate` / `rejected`).
-* **Reward Approval Gating**: Org users propose bounty payouts. The database rejects any payout changes lacking a valid, human `approved_by` ID.
+
+- **Program Setup Wizard**: Form to configure VDP or Bug Bounty scope (in-scope, out-of-scope arrays, rewards, timelines).
+- **Triage Worklist**: Visual board tracking reports. Supports moving reports through states (`new` → `triaging` → `accepted` / `duplicate` / `rejected`).
+- **Reward Approval Gating**: Org users propose bounty payouts. The database rejects any payout changes lacking a valid, human `approved_by` ID.
 
 ### Module 2: Researcher Submission & Earnings
-* **Multi-Step Report Ingestion**: Guided flow (Title, Description, Steps to Reproduce, Impact, Severity self-assessment) with secure attachment upload.
-* **Reputation & Leaderboard**: Calculated using accepted submission numbers and total payouts, excluding profiles configured as system AI agents.
+
+- **Multi-Step Report Ingestion**: Guided flow (Title, Description, Steps to Reproduce, Impact, Severity self-assessment) with secure attachment upload.
+- **Reputation & Leaderboard**: Calculated using accepted submission numbers and total payouts, excluding profiles configured as system AI agents.
 
 ### Module 3: Multi-Engine Deduplication & AI Severity Assessment
-* **Deduplication Chain**: 
-  1. *Exact Hash*: SHA-256 fingerprint comparison of submission body.
-  2. *Fuzzy Text Match*: Trigram indexing (`pg_trgm`) checks title/body similarities.
-  3. *AI Semantic Evaluation*: Claude/Gemini compares finding locations and root causes.
-* **AI Severity Classification**: Generates a predicted severity and confidence score based on CVSS v3.1 parameters.
+
+- **Deduplication Chain**:
+  1. _Exact Hash_: SHA-256 fingerprint comparison of submission body.
+  2. _Fuzzy Text Match_: Trigram indexing (`pg_trgm`) checks title/body similarities.
+  3. _AI Semantic Evaluation_: Claude/Gemini compares finding locations and root causes.
+- **AI Severity Classification**: Generates a predicted severity and confidence score based on CVSS v3.1 parameters.
 
 ### Module 4: Code Quality & Web3 Smart Contract Audits
-* **Static Repo Scanning**: Ingests public repositories via unauthenticated API, running prompt-wrapped security and syntax analysis.
-* **Web3/Solidity Specialization**: Extends scanners to check smart contracts for reentrancy, overflow, oracle manipulation, and gas inefficiencies.
+
+- **Static Repo Scanning**: Ingests public repositories via unauthenticated API, running prompt-wrapped security and syntax analysis.
+- **Web3/Solidity Specialization**: Extends scanners to check smart contracts for reentrancy, overflow, oracle manipulation, and gas inefficiencies.
+- **Deterministic Anti-Pattern Detection**: A dedicated static-analysis pass (`lib/ai/anti-patterns.ts`) runs alongside the AI review — zero AI cost, fully reproducible — catching god objects/oversized files, deep nesting, empty catch/bare-except blocks, long parameter lists, debug leftovers (console.log/debugger), TODO/FIXME density, and cross-file duplicated code blocks. Findings are tagged `source: "static"` vs `source: "ai"` in the UI so it's clear which pass caught what. Runs independently of the AI call, so anti-pattern findings still surface even during a full AI provider outage.
 
 ### Module 5: Penetration Testing as a Service (PTaaS)
-* **Engagements Coordinator**: Creates scheduled pentests with goals. Uses AI to draft structured test plan task lists.
-* **Executive Summary Generator**: Aggregates logged findings into structured JSON report sections with remediation advice.
+
+- **Engagements Coordinator**: Creates scheduled pentests with goals. Uses AI to draft structured test plan task lists.
+- **Executive Summary Generator**: Aggregates logged findings into structured JSON report sections with remediation advice.
 
 ### Module 6: Autonomous AI Red Team
-* **Aggressive Scanning Agent**: Orchestrates security scans against targets with three aggression tiers. Shows step-by-step thinking logs.
-* **Auto-Triage Routing**: Translates discovered weaknesses into submission rows, marked as generated by system AI agents.
+
+- **Aggressive Scanning Agent**: Orchestrates security scans against targets with three aggression tiers. Shows step-by-step thinking logs.
+- **Auto-Triage Routing**: Translates discovered weaknesses into submission rows, marked as generated by system AI agents.
 
 ### Module 7: Capture The Flag (CTF) Competitions
-* **Competition Orchestrator**: Org users create draft/active/ended competitions, defining starts_at/ends_at and publicity.
-* **Challenge Board**: Multi-category Jeopardy-style puzzles (web, crypto, reverse, pwn, forensics, misc, smart_contract, cloud) across four difficulties. Supports point configuration, hints with penalty costs, and attachment files.
-* **Dynamic Decay Solver**: Rewards early solver speeds by dynamically decaying points on subsequent solves.
-* **Hashed Verification Endpoint**: Validates submitted flags via SHA-256 comparison and recomputes the scoreboard. Logs wrong attempts to apply endpoint rate limiting.
+
+- **Competition Orchestrator**: Org users create draft/active/ended competitions, defining starts_at/ends_at and publicity.
+- **Challenge Board**: Multi-category Jeopardy-style puzzles (web, crypto, reverse, pwn, forensics, misc, smart_contract, cloud) across four difficulties. Supports point configuration, hints with penalty costs, and attachment files.
+- **Dynamic Decay Solver**: Rewards early solver speeds by dynamically decaying points on subsequent solves.
+- **Hashed Verification Endpoint**: Validates submitted flags via SHA-256 comparison and recomputes the scoreboard. Logs wrong attempts to apply endpoint rate limiting.
 
 ### Module 8: Code4rena-Style Audit Contests
-* **Contest Coordinator**: Organizations establish scheduled contests with a committed, upfront fixed bounty pool.
-* **Smart Contract Auditor Submissions**: Auditors submit detailed findings targeting specific lines and files in connected repository scopes.
-* **AI Duplicate Grouper**: Automatically analyzes new submissions during the judging phase and pre-groups them semantically based on root causes, accelerating human review.
-* **Pool Payout Calculator**: Implements the Code4rena model (shares = severity_weight / duplicate_count) to fairly distribute rewards, ensuring duplicate findings split the pool instead of getting rejected. Severity weights: Critical=10, High=5, Medium=2, Low=0.5, Info=0.
+
+- **Contest Coordinator**: Organizations establish scheduled contests with a committed, upfront fixed bounty pool.
+- **Smart Contract Auditor Submissions**: Auditors submit detailed findings targeting specific lines and files in connected repository scopes.
+- **AI Duplicate Grouper**: Automatically analyzes new submissions during the judging phase and pre-groups them semantically based on root causes, accelerating human review.
+- **Pool Payout Calculator**: Implements the Code4rena model (shares = severity_weight / duplicate_count) to fairly distribute rewards, ensuring duplicate findings split the pool instead of getting rejected. Severity weights: Critical=10, High=5, Medium=2, Low=0.5, Info=0.
 
 ---
 
@@ -248,16 +271,19 @@ sequenceDiagram
 ```
 
 ### Authentication & Authorization System
+
 - **Supabase Auth**: Mirroring `auth.users` schema to public `profiles` via database trigger functions. Role enforcement (`org`, `researcher`, `triager`, `admin`) validated client-side and server-side via `middleware.ts`.
 - **Row-Level Security (RLS)**: Active on all tables. Enforces that organizations can only access their metrics, and researchers can only view their own submissions.
 
 ### AI Orchestration & Fallback Client
+
 1. **Request Dispatch**: Core modules call `callClaude(opts)`.
 2. **Primary Execution**: Connects to `claude-sonnet-4-6` via fetch. Implements up to 2 retries with exponential backoff on transient errors (e.g., status 429).
 3. **Transparent Fallback**: On failure, authenticates using `GEMINI_API_KEY` and translates the system/user instruction to match `gemini-2.0-flash` parameters.
 4. **Data Normalization**: Transforms Gemini output to Anthropic's message structure, returning to downstream components without breaking parsing.
 
 ### Realtime Synchronization & Event Pipeline
+
 - **Supabase Realtime**: Employs WebSockets to broadcast changes on `submissions` and `notifications` tables.
 - **Resend Mail Delivery**: Server actions send email confirmations for triage status updates and reward approvals using Resend.
 
@@ -266,25 +292,28 @@ sequenceDiagram
 ## 5. PRODUCT DOCUMENTATION
 
 ### PRD (Product Requirements Document)
-* **Vision**: A consolidated security ecosystem where organizations handle vulnerabilities, penetration testing, and code quality audits, assisted by resilient AI triage agents while keeping humans in absolute control.
-* **Target Users**:
-  - *Organizations*: Security directors, tech leads, and triagers.
-  - *Security Researchers*: Ethical hackers, penetration testers, and code auditors.
-* **Success Metrics**: Zero unpaid bounty incidents, sub-30 second first-pass triage duration, 100% database-level audit logs integrity, and 99.9% uptime for AI evaluations.
+
+- **Vision**: A consolidated security ecosystem where organizations handle vulnerabilities, penetration testing, and code quality audits, assisted by resilient AI triage agents while keeping humans in absolute control.
+- **Target Users**:
+  - _Organizations_: Security directors, tech leads, and triagers.
+  - _Security Researchers_: Ethical hackers, penetration testers, and code auditors.
+- **Success Metrics**: Zero unpaid bounty incidents, sub-30 second first-pass triage duration, 100% database-level audit logs integrity, and 99.9% uptime for AI evaluations.
 
 ### TRD (Technical Requirements Document)
+
 - **Database (PostgreSQL)**: Utilizes trigram search extensions (`pg_trgm`) and custom PL/pgSQL database triggers for security invariants.
 - **Hosting Strategy**: Deployed serverless on Cloudflare Pages using `@opennextjs/cloudflare` bridging.
 - **Caching**: Utilizes Upstash Redis REST calls to throttle researcher submission endpoints.
 
 ### UI/UX Design System Brief
+
 - **Color Palette**: Modern dark theme using deep slate base backgrounds (`#09090b`), emerald accent colors (`#10b981`), teal highlights (`#2dd4bf`), and clean borders (`#27272a`).
 - **Typography**: Configured with Geist Sans (body text) and Geist Mono (reproduce steps, logs, and code snippets).
 - **Aesthetics & Motion**: Uses Framer Motion transitions, responsive sidebar panels, layout skeletons to eliminate Cumulative Layout Shift (CLS), and on-demand modal triggers for Command Palette.
 
 ### Database Schema Details
 
-```
+```text
 +------------------+       +-------------------+       +-----------------+
 |   profiles       |       |   organizations   |       |   programs      |
 +------------------+       +-------------------+       +-----------------+
@@ -314,6 +343,7 @@ sequenceDiagram
 ```
 
 #### Core Database Schema DDL Summary
+
 1. `profiles`: Maps users. Includes a boolean column `is_system_agent` to isolate AI red-team scanner actions.
 2. `organizations`: Companies managing programs. Relates to `profiles` via `owner_id`.
 3. `programs`: Bounty/VDP scope parameters.
@@ -331,26 +361,31 @@ sequenceDiagram
 ## 6. IMPLEMENTATION PLAN
 
 ### Phase 1: Foundations & Auth (Week 1)
+
 - Scaffold Next.js 14 project.
 - Deploy Supabase database and enable RLS rules on core profiles.
 - Configure Magic Link and Google OAuth. Integrate role-based routing middleware.
 
 ### Phase 2: Program & Submissions Management (Weeks 2-3)
+
 - Deliver program builder and researcher report submission wizard.
 - Deploy Upstash Redis rate-limiter for report creation endpoints.
 - Seed baseline organizations and scopes.
 
 ### Phase 3: AI Validation & Triager Workflows (Weeks 4-5)
+
 - Code the multi-provider client with Gemini backup support.
 - Deploy exact hash and trigram similarity deduplication checks.
 - Establish Resend notifications pipeline and Supabase Realtime event wiring.
 
 ### Phase 4: Financial Governance & Code Diagnostics (Weeks 6-8)
+
 - Implement human-approval trigger rules on rewards.
 - Set up connected public repository scanners.
 - Design the animated landing pages and register waitlist signups for advanced features.
 
 ### Phase 5: Advanced Security Operations (Weeks 10-14)
+
 - Deploy the complete PTaaS engagement builder and PDF rollup engine.
 - Establish the AI Autonomous Red Team scanner with thinking traces, and map results to the triage pipeline.
 - Deploy Web3 Smart Contract static analysis audits with Solidity SWC weakness classification.
@@ -363,8 +398,10 @@ sequenceDiagram
 ## 7. MASTER BUILD PROMPTS
 
 ### Prompt 1: Multi-Provider AI Deduplication Client
+
 Use this template to build the multi-provider fallback engine:
-```
+
+```text
 System Prompt:
 You are a security vulnerability deduplication expert for a bug bounty platform.
 Your task: Determine whether a NEW submission is a semantic duplicate of any EXISTING submission.
@@ -397,8 +434,10 @@ EXISTING SUBMISSIONS TO COMPARE AGAINST:
 ```
 
 ### Prompt 2: Severity Classification & CVSS Suggestion
+
 Use this template to classify vulnerability severity:
-```
+
+```text
 System Prompt:
 You are a senior security engineer performing vulnerability triage for a bug bounty platform.
 Classify vulnerability severity using CVSS v3.1 principles:
@@ -418,8 +457,10 @@ Respond ONLY with valid JSON. No preamble, no markdown.
 ```
 
 ### Prompt 3: AI Red Team Target Scan & Reasoner
+
 Use this template to execute autonomous red-team exercises:
-```
+
+```text
 System Prompt:
 You are an advanced, autonomous AI Red Team agent scanning a target scope.
 Your goal is to simulate realistic attacker methodology (recon, analysis, exploit planning, execution analysis) and log findings.
@@ -427,8 +468,10 @@ Generate a JSON array of step-by-step thinking traces alongside discovered vulne
 ```
 
 ### Prompt 4: Web3 Smart Contract Static Auditor
+
 Use this template to audit Solidity smart contracts:
-```
+
+```solidity
 System Prompt:
 You are a senior smart contract security auditor with expertise in Solidity and EVM-based contracts. You have deep knowledge of the SWC (Smart Contract Weakness Classification) Registry and common DeFi attack patterns.
 
@@ -483,11 +526,13 @@ JSON schema:
 ## 8. ERRORS & MISTAKES TO AVOID
 
 ### Developer Traps & Security Pitfalls
+
 - **Incorrect Key Exposure**: Never prefix the Supabase Service Role Key with `NEXT_PUBLIC_`. Doing so bypasses all database RLS checks and exposes administrative read/write access to user browsers.
 - **Client Components Event Handlers**: In Next.js App Router, do not use client-side event handlers (like inline `onClick` copy functions) inside Server Components. Always modularize interactive elements (like clipboard copy buttons) into separate `"use client"` components to prevent compile failures.
 - **In-Memory Caches in Edge Hosting**: Do not rely on local variables (like in-memory Javascript Maps) to track rate limits in edge functions. These limits will reset on every serverless invocation. Use Upstash Redis for distributed state caching.
 
 ### Prompt Injection Protections
+
 - **Wrap Input Content**: Never interpolate researcher-supplied text directly into system instruction prompts. Always frame user inputs inside `[DATA]...[/DATA]` delimiters and sanitize the variables to strip out escape strings (like `[/DATA]` or `[SYSTEM]`).
 
 ---
@@ -503,6 +548,7 @@ JSON schema:
 ## 10. DEPLOYMENT & OPERATIONS GUIDE
 
 ### Production Deployment Runbook
+
 1. **Host Configuration**: Register a project in Cloudflare Pages. Point the build settings to:
    - Framework preset: `Next.js` (compiled for Cloudflare Workers/Pages V8 isolate environment via Wrangler)
    - Build command: `npm run build`
@@ -513,20 +559,20 @@ JSON schema:
    ```sql
    select tablename, rowsecurity from pg_tables where schemaname = 'public';
    ```
-   *Expected: Every row must return `rowsecurity = true`.*
+   _Expected: Every row must return `rowsecurity = true`._
 4. **Active Uptime Checking**: Configure monitors on UptimeRobot for:
    - Dashboard index page: `https://your-domain.com`
    - AI API endpoint: `https://your-domain.com/api/ai/validate-submission`
 5. **Email Domain Configuration**: Configure sending domains in Resend (or your chosen provider) to ensure reliable Magic Link authentication delivery:
-   - *SPF (TXT record)*: Add `v=spf1 include:providers.resend.com ~all` on your sending subdomain/domain.
-   - *DKIM (CNAME records)*: Map the three dynamic CNAME records provided in the Resend console (e.g. `resend1._domainkey` pointing to `dkim1.resend.com`).
-   - *DMARC (TXT record)*: Setup `_dmarc` with a quarantine monitoring policy: `v=DMARC1; p=quarantine; pct=100;`.
+   - _SPF (TXT record)_: Add `v=spf1 include:providers.resend.com ~all` on your sending subdomain/domain.
+   - _DKIM (CNAME records)_: Map the three dynamic CNAME records provided in the Resend console (e.g. `resend1._domainkey` pointing to `dkim1.resend.com`).
+   - _DMARC (TXT record)_: Setup `_dmarc` with a quarantine monitoring policy: `v=DMARC1; p=quarantine; pct=100;`.
    - Verify active status in the provider domains panel before launching user access.
 6. **Attachment Storage Configuration**: Configure secure private attachment storage for submission evidence:
    - Run the migration file `supabase/migrations/013_attachments.sql` in the Supabase SQL Editor.
    - This creates a private `attachments` bucket with a 10MB size limit and allowed safe MIME types (`image/*`, `application/pdf`, `.json`, `.txt`).
    - Row-level security (RLS) policies are automatically configured to restrict access to the file owner (researcher) and the program owner (organization members).
-7. **Push Notifications Configuration (Coming Soon)**: Real-time In-App push notifications are currently in a "Coming Soon" development phase. The frontend toggle controls are disabled to prevent broken user expectations. Enabling this in the future requires VAPID key generation (`web-push` CLI), service worker registration script imports, FCM project keys, and database push subscription storage configurations.
+7. **Push Notifications Configuration**: Native browser/OS push notifications are live (migration `014_push_notifications.sql`). Setup: generate a VAPID key pair (`npx web-push generate-vapid-keys`), set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in your environment, and users opt in via the toggle at Settings → Notifications. Delivery is handled server-side by `lib/notifications/push.ts` and fired automatically alongside every existing in-app/email notification event in `lib/notifications/service.ts` — no per-event wiring needed. Dead subscriptions (revoked permission, cleared browser data) are pruned automatically on 404/410 responses from the push service.
 8. **Retry and Backoff Configuration (Cloudflare Safe)**: To comply with Cloudflare Workers' 30-second hard execution limits, VAULTX enforces bounded retry parameters on all third-party API clients. Ensure the primary AI client (`lib/ai/claude.ts`) and any new endpoints maintain:
    - Maximum retry attempt cap set to `1` (plus initial try).
    - Single-request fetch timeout bound to `10s` (using AbortControllers).
@@ -536,6 +582,7 @@ JSON schema:
 10. **AI Output Validation & JSON Safety**: All AI modules generating structured data (e.g. PTaaS test plans or vulnerability summaries) parse responses defensively. Enclose JSON decoding logic in `try-catch` structures. Validate the parsed payloads against typed schemas (e.g. using Zod) before database storage. If parsing fails, fall back to predefined placeholder templates to prevent server crashes.
 
 ### Smoke Testing Walkthrough
+
 - Navigate to the production URL in an incognito window.
 - Register a test researcher account and confirm receipt of the Magic Link email.
 - Submit a test vulnerability report. Verify that the Multi-Provider client suggests a severity score within 30 seconds.
@@ -543,6 +590,7 @@ JSON schema:
 - Click **Approve**. Confirm that the database registers your profile as the human authorizer.
 
 ### Demo Presentation Script (Target: 6-7 Minutes)
+
 1. **The Hook (0:00 - 0:30)**: Open on the landing page. Explain that VAULTX unifies bug bounty, VDP, pentesting, and automated audits, keeping humans in control of outcomes.
 2. **Core Loop Demonstration (0:30 - 2:30)**: Arrange a Researcher window next to an Org window. Submit a vulnerability report. Show the live, no-refresh status changes and the AI severity suggestion panel.
 3. **Security Governance Guardrails (2:30 - 3:30)**: Propose a $500 bounty. Demonstrate that database triggers block reward approvals unless explicitly signed off by a human.
@@ -550,12 +598,14 @@ JSON schema:
 5. **Roadmap & Close (4:30 - 5:30)**: Present the Live PTaaS report dashboards and autonomous AI Red Team thinking logs. Conclude by highlighting the zero-infrastructure-cost serverless deployment.
 
 ### Accessibility Audit (WCAG 2.1 AA Compliance)
+
 - **Keyboard Navigation**: Implemented `<SkipToContent />` as the first focusable element on all routes, linking straight to `#main-content` to skip sidebar menus.
 - **Screen Reader Support**: Confirmed that all icon-only buttons (sidebar toggle, logout, alert bell) carry explicit `aria-label` attributes.
 - **Contrast & Meaning**: Checked that muted dashboard text meets the 4.5:1 minimum contrast ratio. Ensured that triage severity indicators pair colored status badges with readable text labels so color is not the only signal used.
 - **Motion Reduction**: Framer Motion animation configurations automatically respect `prefers-reduced-motion` settings.
 
 ### Performance & Bundle Audits
+
 - **Lazy Loading Components**: Dynamic imports (`next/dynamic`) load the Command Palette modal code on-demand. This reduces the initial bundle size of all dashboard routes by ~20KB.
 - **Font & Image Optimization**: Self-hosts typography packages via `next/font` to bypass render-blocking requests. Configured strict domain validation rules in `next.config.ts` to secure image rendering endpoints.
 
@@ -566,10 +616,10 @@ JSON schema:
 The settings system provides comprehensive control for personal accounts and organizations. Detailed architectural documentation, database schemas, and server action definitions can be found in [settings_system_architecture.md](file:///C:/Users/hp/.gemini/antigravity-ide/brain/2e6daf62-254d-42d1-bd5b-60ed68d467f6/settings_system_architecture.md).
 
 ### Quick Summary of Features
+
 - **Profile Customization**: Avatar crop uploads linked directly to the Supabase `avatars` Storage bucket.
 - **Security Control**: Password strength enforcement and session revocation tables (OS, IP, agent tracking).
 - **Organization Settings**: Invitation control workflows, membership management, default roles, and required domain signup rules.
 - **API Key Engine**: Dynamic key prefixes and double-hashed API keys for external access.
 - **Status & Integration Tiles**: Connectors for Slack notifications, Resend email deliveries, and GitHub integrations.
 - **Lifecycle Protection**: A verify-first Danger Zone for account deletion or factory resets.
-

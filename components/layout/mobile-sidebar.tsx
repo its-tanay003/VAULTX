@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ShieldCheck, LayoutDashboard, Target, Bug, FileSearch,
   Trophy, Settings, LogOut, Menu, X, BarChart3, Code2,
-  Bell, Shield, Zap,
+  Bell, Shield, Zap, Flag, Scale,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn }            from "@/lib/utils";
@@ -21,6 +21,8 @@ const ORG_NAV = [
   { href: "/dashboard/ptaas",           icon: Shield,          label: "PTaaS" },
   { href: "/dashboard/code-quality",    icon: Code2,           label: "Code Quality" },
   { href: "/dashboard/ai-red-team",     icon: Zap,             label: "AI Red Team" },
+  { href: "/dashboard/ctf",             icon: Flag,            label: "CTF" },
+  { href: "/dashboard/contests",        icon: Scale,           label: "Contests" },
 ];
 
 const RESEARCHER_NAV = [
@@ -31,14 +33,14 @@ const RESEARCHER_NAV = [
   { href: "/dashboard/ptaas",                   icon: Shield,          label: "PTaaS" },
   { href: "/dashboard/researcher/leaderboard", icon: BarChart3,       label: "Leaderboard" },
   { href: "/dashboard/code-quality",           icon: Code2,           label: "Code Quality" },
+  { href: "/dashboard/ctf",                    icon: Flag,            label: "CTF" },
+  { href: "/dashboard/contests",               icon: Scale,           label: "Contests" },
 ];
 
 const BOTTOM_NAV = [
   { href: "/dashboard/notifications", icon: Bell,     label: "Notifications" },
   { href: "/dashboard/settings",      icon: Settings, label: "Settings" },
 ];
-
-const STUB_MODULES: { href: string; icon: any; label: string }[] = [];
 
 interface Props {
   role:      UserRole;
@@ -130,27 +132,6 @@ export function MobileSidebar({ role, fullName, email, avatarUrl }: Props) {
                     {label}
                   </Link>
                 ))}
-
-                <div className="pt-3 pb-1">
-                  <div className="px-3 mb-1.5 text-[10px] font-medium text-vault-muted uppercase tracking-wider">
-                    Coming soon
-                  </div>
-                  {STUB_MODULES.map(({ href, icon: Icon, label }) => (
-                    <Link
-                      key={href}
-                      href={href}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                        isActive(href)
-                          ? "text-vault-teal bg-vault-teal-faint border border-vault-border"
-                          : "text-vault-muted hover:text-vault-text hover:bg-vault-elevated"
-                      )}
-                    >
-                      <Icon className="w-4.5 h-4.5 shrink-0" /> {label}
-                    </Link>
-                  ))}
-                </div>
               </nav>
 
               {/* Bottom */}

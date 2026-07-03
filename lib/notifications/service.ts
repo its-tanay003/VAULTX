@@ -10,6 +10,7 @@
 
 import { createClient }    from "@/lib/supabase/server";
 import { sendEmail }       from "@/lib/email/resend";
+import { sendPushToUser }  from "@/lib/notifications/push";
 import {
   submissionReceivedEmail,
   submissionAcceptedEmail,
@@ -42,6 +43,15 @@ async function createNotification(params: {
     entity_id: params.entityId ?? null,
   });
   if (error) console.error("[Notify] Insert failed:", error.message);
+
+  // Fire-and-forget: never let a push failure affect the calling event.
+  // No-ops instantly if the user has no active push subscriptions.
+  sendPushToUser(params.userId, {
+    title: params.title,
+    body:  params.body,
+    link:  params.link,
+    tag:   params.entityId,
+  }).catch((err) => console.error("[Notify] Push dispatch failed:", err));
 }
 
 /* ─── Preference check ────────────────────────────────────────────────────── */

@@ -62,9 +62,12 @@ export function parseGithubUrl(url: string): ParsedRepoUrl | null {
 
 /* ─── Fetch repo metadata ─────────────────────────────────────────────────── */
 export async function fetchRepoMetadata(owner: string, repo: string): Promise<RepoMetadata> {
-  const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}`, {
-    headers: { Accept: "application/vnd.github+json" },
-  });
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
+  if (process.env.GITHUB_TOKEN) {
+    headers["Authorization"] = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}`, { headers });
 
   if (res.status === 404) throw new Error("Repository not found or is private");
   if (res.status === 403) throw new Error("GitHub API rate limit exceeded — try again in a few minutes");
@@ -90,9 +93,14 @@ export async function fetchRepoTree(
   branch: string,
   extensions: string[] = DEFAULT_SCANNABLE_EXT
 ): Promise<string[]> {
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
+  if (process.env.GITHUB_TOKEN) {
+    headers["Authorization"] = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
-    { headers: { Accept: "application/vnd.github+json" } }
+    { headers }
   );
 
   if (!res.ok) throw new Error(`Failed to fetch repo tree: ${res.status}`);

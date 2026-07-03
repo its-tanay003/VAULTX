@@ -271,9 +271,6 @@ export default function OrganizationSettingsPage() {
       {/* Security Policies */}
       <SectionCard title="Security Policies" description="Enforce security standards across your organization">
         <div>
-          <FieldRow label="Require 2FA" description="All team members must enable two-factor authentication">
-            <SettingsToggle checked={require2FA} onChange={setRequire2FA} />
-          </FieldRow>
           <FieldRow label="SSO / SAML" description="Enable single sign-on for your organization">
             <SettingsToggle checked={ssoEnabled} onChange={setSsoEnabled} />
           </FieldRow>

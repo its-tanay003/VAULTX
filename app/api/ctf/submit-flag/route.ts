@@ -1,6 +1,6 @@
 import { NextResponse }  from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createHash }   from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 
 /**
  * POST /api/ctf/submit-flag
@@ -96,7 +96,12 @@ export async function POST(request: Request) {
 
     // Hash the submitted flag and compare
     const submittedHash = createHash("sha256").update(flag.trim()).digest("hex");
-    const correct = submittedHash === challenge.flag_hash;
+    
+    // Use constant-time comparison to prevent timing attacks
+    const correct = timingSafeEqual(
+      Buffer.from(submittedHash, "hex"),
+      Buffer.from(challenge.flag_hash, "hex")
+    );
 
     if (!correct) {
       // Record wrong attempt for rate limiting

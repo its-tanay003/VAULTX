@@ -5,6 +5,7 @@ import { toast }               from "sonner";
 import { Loader2, Save }       from "lucide-react";
 import { updateUserSettings }  from "@/app/actions/settings";
 import { SectionCard, FieldRow, SettingsToggle } from "@/components/settings/section-card";
+import { PushNotificationToggle } from "@/components/notifications/push-toggle";
 
 export default function NotificationsSettingsPage() {
   const [pending, start] = useTransition();
@@ -12,10 +13,6 @@ export default function NotificationsSettingsPage() {
   const [securityAlerts, setSecurityAlerts]   = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(true);
   const [weeklyDigest, setWeeklyDigest]       = useState(false);
-  const [submissionUpdates, setSubmissionUpdates] = useState(true);
-  const [rewardAlerts, setRewardAlerts]           = useState(true);
-  const [programChanges, setProgramChanges]       = useState(true);
-  const [teamActivity, setTeamActivity]           = useState(false);
   const [slackWebhook, setSlackWebhook] = useState("");
 
   function handleSave() {
@@ -50,24 +47,21 @@ export default function NotificationsSettingsPage() {
         </div>
       </SectionCard>
 
-      <SectionCard 
-        title="In-App Notifications (Coming Soon)" 
-        description="Real-time alerts inside the dashboard (Currently in development)"
+      <SectionCard
+        title="Push Notifications"
+        description="Native browser/OS alerts, even when VAULTX isn't open in a tab"
       >
-        <div className="space-y-0 opacity-50 pointer-events-none">
-          <FieldRow label="Submission status updates" description="When your report status changes">
-            <SettingsToggle checked={submissionUpdates} onChange={setSubmissionUpdates} disabled={true} />
-          </FieldRow>
-          <FieldRow label="Reward payouts" description="When rewards are approved or paid">
-            <SettingsToggle checked={rewardAlerts} onChange={setRewardAlerts} disabled={true} />
-          </FieldRow>
-          <FieldRow label="Program changes" description="New programs, scope changes, pauses">
-            <SettingsToggle checked={programChanges} onChange={setProgramChanges} disabled={true} />
-          </FieldRow>
-          <FieldRow label="Team activity" description="New team members, org events">
-            <SettingsToggle checked={teamActivity} onChange={setTeamActivity} disabled={true} />
-          </FieldRow>
-        </div>
+        <FieldRow
+          label="Push notifications"
+          description="Submission updates, reward approvals, and program changes"
+        >
+          <PushNotificationToggle />
+        </FieldRow>
+        <p className="text-[11px] text-vault-muted mt-3">
+          In-app alerts (the bell icon in the dashboard) are always on and
+          don't require this toggle — this controls native OS notifications
+          only.
+        </p>
       </SectionCard>
 
       <SectionCard title="Slack Notifications" description="Forward alerts to a personal Slack channel">
