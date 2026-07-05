@@ -1,0 +1,63 @@
+name: Performance Budget Check
+
+# Was a hard cut in the original blueprint ("DO NOT BUILD: Performance
+# engineering CI/CD") — this is the first implementation. Runs on every
+# PR into main so a performance regression is caught before merge, not
+# discovered in production after the fact.
+#
+# Scope, deliberately kept realistic for a platform with real auth-gated
+# dashboards: Lighthouse runs against the public, unauthenticated routes
+# (landing page + API docs) since those are the only pages CI can
+# meaningfully render without live Supabase credentials in the runner.
+# The bundle size check, by contrast, covers every route Next.js builds,
+# authenticated or not, since that's a static analysis of build output
+# rather than a live page render.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  performance-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (plain Next.js output, not the Cloudflare Worker bundle)
+        # Uses `build-next` (plain `next build`), not the default `build`
+        # script (which runs the full OpenNext/Cloudflare transform) —
+        # Lighthouse just needs `next start` to serve the standard `.next`
+        # output, so running the Cloudflare bundling step here would be
+        # pure wasted CI time with no effect on what's being measured.
+        run: npm run build-next
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-ci-build-only
+
+      - name: Check bundle size budgets
+        run: node scripts/check-bundle-size.js
+
+      - name: Start server
+        run: npm run start & npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run Lighthouse CI
+        run: npx lhci autorun
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results
+          path: .lighthouseci/
+          retention-days: 14

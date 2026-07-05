@@ -199,3 +199,66 @@ export function rewardApprovedEmail(d: RewardEmailData): string {
     `,
   });
 }
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* 7. Payout receipt (to RESEARCHER) — sent after a Stripe transfer succeeds  */
+/* ─────────────────────────────────────────────────────────────────────────── */
+export function payoutReceiptEmail(d: RewardEmailData & { transferId: string }): string {
+  const url = `${APP}/dashboard/researcher/rewards`;
+  const amount = new Intl.NumberFormat("en-US", {
+    style: "currency", currency: d.currency, minimumFractionDigits: 0,
+  }).format(d.amount);
+
+  return emailBase({
+    title:       `Payout sent: ${amount}`,
+    previewText: `${amount} has been transferred to your connected Stripe account`,
+    body: `
+      ${emailH1("Payout sent ✅")}
+      ${emailP(`<strong style="color:#fafafa;">${amount}</strong> has been transferred to your connected Stripe account for your report to ${d.orgName}.`)}
+      ${emailDivider()}
+      <table cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:20px;">
+        ${emailMeta("Report",      `<span style="color:#fafafa;">${d.submissionTitle}</span>`)}
+        ${emailMeta("Program",     d.programName)}
+        ${emailMeta("Amount",      `<span style="color:#2dd4bf;font-size:18px;font-weight:600;">${amount}</span>`)}
+        ${emailMeta("Transfer ID", `<span style="color:#71717a;font-family:monospace;font-size:12px;">${d.transferId}</span>`)}
+        ${emailMeta("Status",      emailBadge("PAID", "green"))}
+      </table>
+      ${emailP("Funds typically arrive in your bank account within Stripe's standard payout schedule (usually 2-3 business days for standard payouts).", true)}
+      ${emailButton("View Earnings", url)}
+    `,
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* 8. Payout failed (to ORG OWNER) — admin alert, not researcher-facing       */
+/* ─────────────────────────────────────────────────────────────────────────── */
+export function payoutFailedEmail(d: {
+  submissionTitle: string;
+  researcherName:  string;
+  amount:          number;
+  currency:        string;
+  reason:          string;
+}): string {
+  const url = `${APP}/dashboard/org/rewards`;
+  const amount = new Intl.NumberFormat("en-US", {
+    style: "currency", currency: d.currency, minimumFractionDigits: 0,
+  }).format(d.amount);
+
+  return emailBase({
+    title:       `Payout failed: ${amount}`,
+    previewText: `A payout to ${d.researcherName} failed — action needed`,
+    body: `
+      ${emailH1("Payout failed ⚠️")}
+      ${emailP(`A ${amount} payout to <strong style="color:#fafafa;">${d.researcherName}</strong> failed and was not delivered.`)}
+      ${emailDivider()}
+      <table cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:20px;">
+        ${emailMeta("Report",  `<span style="color:#fafafa;">${d.submissionTitle}</span>`)}
+        ${emailMeta("Amount",  amount)}
+        ${emailMeta("Reason",  `<span style="color:#f87171;">${d.reason}</span>`)}
+        ${emailMeta("Status",  emailBadge("FAILED", "red"))}
+      </table>
+      ${emailP("The reward remains approved and unpaid — retry from the rewards dashboard once the underlying issue is resolved.", true)}
+      ${emailButton("View Rewards", url)}
+    `,
+  });
+}

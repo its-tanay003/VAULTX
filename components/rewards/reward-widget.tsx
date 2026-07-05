@@ -20,6 +20,9 @@ interface ExistingReward {
   note:         string | null;
   approved_at:  string | null;
   paid_at:      string | null;
+  payout_status?: string;
+  payout_failure_reason?: string | null;
+  held_for_threshold?: boolean;
 }
 
 interface Props {
@@ -137,10 +140,18 @@ export function RewardWidget({ submissionId, existingReward, minReward, maxRewar
   function handleMarkPaid() {
     start(async () => {
       try {
-        await markRewardPaid(existingReward!.id);
-        toast.success("Marked as paid");
+        const result = await markRewardPaid(existingReward!.id);
+        if (result.held) {
+          toast.info("Held — researcher hasn't reached their minimum payout threshold yet");
+        } else {
+          toast.success(
+            result.groupedCount && result.groupedCount > 1
+              ? `Payout sent via Stripe (combined with ${result.groupedCount - 1} other held reward(s))`
+              : "Payout sent via Stripe"
+          );
+        }
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Failed to mark as paid");
+        toast.error(err instanceof Error ? err.message : "Failed to send payout");
       }
     });
   }
@@ -235,16 +246,35 @@ export function RewardWidget({ submissionId, existingReward, minReward, maxRewar
       )}
 
       {existingReward.status === "approved" && (
-        <button
-          onClick={handleMarkPaid}
-          disabled={pending}
-          className="btn-teal w-full flex items-center justify-center gap-2 text-sm disabled:opacity-40"
-        >
-          {pending
-            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            : <DollarSign className="w-3.5 h-3.5" />}
-          Mark as Paid
-        </button>
+        <div className="space-y-2">
+          {existingReward.held_for_threshold && existingReward.payout_status !== "failed" && (
+            <div className="flex gap-2 bg-blue-950/30 border border-blue-900/40 rounded-lg p-3">
+              <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-blue-300 leading-relaxed">
+                Held — this researcher's unpaid approved total hasn't reached their minimum payout
+                threshold yet. It'll be included automatically in their next payout once it does.
+              </p>
+            </div>
+          )}
+          {existingReward.payout_status === "failed" && existingReward.payout_failure_reason && (
+            <div className="flex gap-2 bg-red-950/30 border border-red-900/40 rounded-lg p-3">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-red-300 leading-relaxed">
+                Last payout attempt failed: {existingReward.payout_failure_reason}
+              </p>
+            </div>
+          )}
+          <button
+            onClick={handleMarkPaid}
+            disabled={pending}
+            className="btn-teal w-full flex items-center justify-center gap-2 text-sm disabled:opacity-40"
+          >
+            {pending
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <DollarSign className="w-3.5 h-3.5" />}
+            {existingReward.payout_status === "failed" ? "Retry Payout" : "Pay via Stripe"}
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,9 +1,10 @@
 import { createClient }  from "@/lib/supabase/server";
 import { redirect }       from "next/navigation";
+import Link                from "next/link";
 import { getUserSettings } from "@/app/actions/settings";
 import { ApiKeyTable }    from "@/components/settings/api-key-table";
 import { SectionCard }    from "@/components/settings/section-card";
-import { Key }            from "lucide-react";
+import { Key, BookOpen }  from "lucide-react";
 
 export default async function ApiKeysPage() {
   const supabase = createClient();
@@ -30,6 +31,9 @@ export default async function ApiKeysPage() {
               <p>Use API keys to authenticate requests from CI/CD pipelines, scripts, or external tools.</p>
               <p>Keys are shown only once on creation — store them securely. Maximum 10 keys per account.</p>
               <p>Include the key in requests as: <code className="font-mono bg-vault-surface px-1 py-0.5 rounded">Authorization: Bearer vx_...</code></p>
+              <Link href="/docs/api" className="inline-flex items-center gap-1.5 text-vault-teal hover:underline pt-1">
+                <BookOpen className="w-3.5 h-3.5" /> Full API documentation
+              </Link>
             </div>
           </div>
         </div>

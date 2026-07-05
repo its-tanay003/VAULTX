@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "lighthouse": "lhci autorun",
+    "check-bundle-size": "node scripts/check-bundle-size.js",
     "deploy": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && opennextjs-cloudflare deploy",
     "preview": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && opennextjs-cloudflare preview"
   },
@@ -31,15 +33,17 @@
     "lucide-react": "^0.395.0",
     "next": "14.2.35",
     "next-themes": "^0.3.0",
-    "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sonner": "^1.5.0",
+    "stripe": "^16.2.0",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.14.0",
     "@opennextjs/cloudflare": "^1.19.11",
     "@types/node": "^20.14.9",
     "@types/react": "^18.3.3",
@@ -51,6 +55,7 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.3",
+    "wait-on": "^7.2.0",
     "wrangler": "^4.101.0"
   }
 }

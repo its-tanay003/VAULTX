@@ -18,6 +18,8 @@ import {
   submissionNeedsInfoEmail,
   submissionDuplicateEmail,
   rewardApprovedEmail,
+  payoutReceiptEmail,
+  payoutFailedEmail,
 } from "@/lib/email/templates/submission";
 
 const APP = process.env.NEXT_PUBLIC_APP_URL ?? "https://vaultx.io";
@@ -332,7 +334,94 @@ export async function notifyRewardApproved(params: {
   }
 }
 
-/* ─── Mark notifications as read ─────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* Event: Payout succeeded (notify RESEARCHER — receipt)                      */
+/* ─────────────────────────────────────────────────────────────────────────── */
+export async function notifyPayoutSucceeded(params: {
+  submissionId:    string;
+  submissionTitle: string;
+  programName:     string;
+  researcherId:    string;
+  researcherName:  string;
+  orgName:         string;
+  amount:          number;
+  currency:        string;
+  transferId:      string;
+}): Promise<void> {
+  const formatted = new Intl.NumberFormat("en-US", {
+    style: "currency", currency: params.currency, minimumFractionDigits: 0,
+  }).format(params.amount);
+
+  await createNotification({
+    userId:   params.researcherId,
+    type:     "payout_succeeded",
+    title:    `Payout sent: ${formatted}`,
+    body:     `${formatted} has been transferred to your connected Stripe account`,
+    link:     "/dashboard/researcher/rewards",
+    entity:   "rewards",
+    entityId: params.submissionId,
+  });
+
+  const email = await shouldEmailUser(params.researcherId, "email_reward_update");
+  if (email) {
+    await sendEmail({
+      to:      email,
+      subject: `[VAULTX] Payout sent: ${formatted}`,
+      html:    payoutReceiptEmail({
+        submissionTitle: params.submissionTitle,
+        programName:     params.programName,
+        amount:          params.amount,
+        currency:        params.currency,
+        orgName:         params.orgName,
+        researcherName:  params.researcherName,
+        transferId:      params.transferId,
+      }),
+    });
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* Event: Payout failed (notify ORG OWNER — admin alert, not researcher)      */
+/* ─────────────────────────────────────────────────────────────────────────── */
+export async function notifyPayoutFailed(params: {
+  orgOwnerId:      string;
+  submissionTitle: string;
+  researcherName:  string;
+  amount:          number;
+  currency:        string;
+  reason:          string;
+  rewardId:        string;
+}): Promise<void> {
+  await createNotification({
+    userId:   params.orgOwnerId,
+    type:     "payout_failed",
+    title:    `Payout failed — action needed`,
+    body:     `A payout to ${params.researcherName} failed: ${params.reason}`,
+    link:     "/dashboard/org/rewards",
+    entity:   "rewards",
+    entityId: params.rewardId,
+  });
+
+  // Admin alerts always email regardless of preference — this is an
+  // action-needed failure state, not a routine update the org can opt out of.
+  const supabase = createClient();
+  const { data: orgOwner } = await supabase.from("profiles").select("email").eq("id", params.orgOwnerId).single();
+  if (orgOwner?.email) {
+    await sendEmail({
+      to:      orgOwner.email,
+      subject: `[VAULTX] Payout failed — action needed`,
+      html:    payoutFailedEmail({
+        submissionTitle: params.submissionTitle,
+        researcherName:  params.researcherName,
+        amount:          params.amount,
+        currency:        params.currency,
+        reason:          params.reason,
+      }),
+    });
+  }
+}
+
+
 export async function markNotificationsRead(userId: string, ids?: string[]): Promise<void> {
   const supabase = createClient();
   let q = supabase

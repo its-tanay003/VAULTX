@@ -7,6 +7,7 @@ import {
   User, Paperclip, Bug, RotateCcw,
 } from "lucide-react";
 import { TriageActions }     from "@/components/submissions/triage-actions";
+import { RewardWidget }      from "@/components/rewards/reward-widget";
 import { AIConfidenceBar }   from "@/components/submissions/ai-confidence-bar";
 import { RealtimeSubmissionStatus } from "@/components/realtime/realtime-submission-status";
 import { formatDate, formatRelativeTime } from "@/lib/utils";
@@ -52,7 +53,7 @@ export default async function OrgSubmissionDetailPage({ params }: Props) {
     .from("submissions")
     .select(`
       *,
-      programs!inner(id, name, type, org_id),
+      programs!inner(id, name, type, org_id, min_reward, max_reward),
       profiles!submissions_researcher_id_fkey(id, full_name, username, avatar_url, reputation)
     `)
     .eq("id", params.id)
@@ -67,6 +68,12 @@ export default async function OrgSubmissionDetailPage({ params }: Props) {
   const isOrgViewer = profile?.org_id === program?.org_id ||
     ["triager","admin"].includes(profile?.role ?? "");
   if (!isOrgViewer) notFound();
+
+  const { data: existingReward } = await supabase
+    .from("rewards")
+    .select("id, amount, currency, status, note, approved_at, paid_at, payout_status, payout_failure_reason, held_for_threshold")
+    .eq("submission_id", sub.id)
+    .maybeSingle();
 
   // Load duplicate original if flagged
   let duplicateOriginal: { id: string; title: string } | null = null;
@@ -214,6 +221,20 @@ export default async function OrgSubmissionDetailPage({ params }: Props) {
 
         {/* Sidebar */}
         <div className="space-y-4">
+
+          {/* Reward — was fully built (propose/approve/pay, including
+              Stripe payout) but never rendered anywhere in the app until
+              now. Gated to accepted submissions, matching proposeReward's
+              own guard, or shown regardless if a reward already exists
+              (e.g. viewing status after the submission's status changed). */}
+          {(sub.status === "accepted" || existingReward) && (
+            <RewardWidget
+              submissionId={sub.id}
+              existingReward={existingReward}
+              minReward={program?.min_reward ?? null}
+              maxReward={program?.max_reward ?? null}
+            />
+          )}
 
           {/* AI Panel */}
           <div className="vault-card p-4">

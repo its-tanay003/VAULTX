@@ -11,9 +11,14 @@
  * existing code quality module (lib/ai/code-review.ts) needs zero
  * changes.
  *
- * Uses GitHub's unauthenticated public REST API. No OAuth, no stored
- * tokens. Rate limit: 60 requests/hour per IP — sufficient for
- * demo-scale scanning.
+ * Uses GitHub's public REST API when no token is given (60 req/hour
+ * per IP — fine for demo-scale scanning). When a GitHub App
+ * installation token is passed (see lib/github/app-auth.ts and
+ * app/actions/github-app.ts), fetchRepoTree/fetchFileContent/fetchFiles
+ * authenticate as that installation instead, which is what makes
+ * private repo scanning actually work end-to-end — previously only
+ * fetchRepoMetadata accepted a token, so the private-repo error message
+ * would clear but the subsequent tree/file fetches would silently fail.
  */
 
 const GITHUB_API = "https://api.github.com";
@@ -61,20 +66,24 @@ export function parseGithubUrl(url: string): ParsedRepoUrl | null {
 }
 
 /* ─── Fetch repo metadata ─────────────────────────────────────────────────── */
-export async function fetchRepoMetadata(owner: string, repo: string): Promise<RepoMetadata> {
-  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-  if (process.env.GITHUB_TOKEN) {
-    headers["Authorization"] = `Bearer ${process.env.GITHUB_TOKEN}`;
-  }
-
-  const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}`, { headers });
+export async function fetchRepoMetadata(owner: string, repo: string, token?: string): Promise<RepoMetadata> {
+  const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
 
   if (res.status === 404) throw new Error("Repository not found or is private");
   if (res.status === 403) throw new Error("GitHub API rate limit exceeded — try again in a few minutes");
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
 
   const data = await res.json();
-  if (data.private) throw new Error("Private repositories are not yet supported");
+  // Private repos are only supported when accessed through an authenticated
+  // GitHub App installation token — never via the unauthenticated public path.
+  if (data.private && !token) {
+    throw new Error("Private repositories require connecting the VAULTX GitHub App for this organization (Settings → Integrations).");
+  }
 
   return {
     fullName:      data.full_name,
@@ -91,16 +100,17 @@ export async function fetchRepoTree(
   owner: string,
   repo: string,
   branch: string,
-  extensions: string[] = DEFAULT_SCANNABLE_EXT
+  extensions: string[] = DEFAULT_SCANNABLE_EXT,
+  token?: string
 ): Promise<string[]> {
-  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-  if (process.env.GITHUB_TOKEN) {
-    headers["Authorization"] = `Bearer ${process.env.GITHUB_TOKEN}`;
-  }
-
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
-    { headers }
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    }
   );
 
   if (!res.ok) throw new Error(`Failed to fetch repo tree: ${res.status}`);
@@ -137,8 +147,27 @@ export function selectPrioritySolidityFiles(paths: string[], max = 10): string[]
 
 /* ─── Fetch raw file content ───────────────────────────────────────────────── */
 export async function fetchFileContent(
-  owner: string, repo: string, branch: string, path: string
+  owner: string, repo: string, branch: string, path: string, token?: string
 ): Promise<string> {
+  if (token) {
+    // Private repos: raw.githubusercontent.com doesn't accept App
+    // installation tokens for private content, so we go through the
+    // authenticated Contents API instead, requesting the raw media
+    // type to skip the usual base64 envelope.
+    const res = await fetch(
+      `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.raw+json",
+        },
+      }
+    );
+    if (!res.ok) return "";
+    const text = await res.text();
+    return text.slice(0, 8000);
+  }
+
   const res = await fetch(
     `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`
   );
@@ -149,12 +178,12 @@ export async function fetchFileContent(
 
 /* ─── Fetch multiple files in parallel ───────────────────────────────────── */
 export async function fetchFiles(
-  owner: string, repo: string, branch: string, paths: string[]
+  owner: string, repo: string, branch: string, paths: string[], token?: string
 ): Promise<RepoFile[]> {
   const results = await Promise.all(
     paths.map(async (path) => ({
       path,
-      content: await fetchFileContent(owner, repo, branch, path),
+      content: await fetchFileContent(owner, repo, branch, path, token),
     }))
   );
   return results.filter((f) => f.content.length > 0);

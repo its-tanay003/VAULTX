@@ -2,9 +2,10 @@ import { createClient }   from "@/lib/supabase/server";
 import { redirect }        from "next/navigation";
 import Link                from "next/link";
 import {
-  Trophy, DollarSign, Clock, CheckCircle2, ChevronRight,
+  Trophy, DollarSign, Clock, CheckCircle2, ChevronRight, AlertTriangle,
 } from "lucide-react";
 import { StatCard }        from "@/components/ui/stat-card";
+import { StripeConnectCard } from "@/components/payouts/stripe-connect-card";
 import { formatCurrency, formatDate, truncate } from "@/lib/utils";
 import type { Metadata }   from "next";
 import type { RewardStatus } from "@/lib/supabase/types";
@@ -18,15 +19,27 @@ const STATUS_CFG: Record<RewardStatus, { label: string; cls: string }> = {
   declined: { label: "Declined",         cls: "text-red-400 bg-red-950/50 border-red-900/50" },
 };
 
+const PAYOUT_STATUS_CFG: Record<string, { label: string; cls: string }> = {
+  processing: { label: "Processing",  cls: "text-blue-400 bg-blue-950/50 border-blue-900/50" },
+  failed:     { label: "Payout failed", cls: "text-red-400 bg-red-950/50 border-red-900/50" },
+};
+
 export default async function ResearcherRewardsPage() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("stripe_onboarding_complete, stripe_payouts_enabled")
+    .eq("id", user.id)
+    .single();
+
   const { data: rewards } = await supabase
     .from("rewards")
     .select(`
       id, amount, currency, status, created_at, approved_at, paid_at, note,
+      payout_status, payout_failure_reason,
       submissions(id, title, severity),
       organizations(name)
     `)
@@ -44,6 +57,11 @@ export default async function ResearcherRewardsPage() {
         <h1 className="text-xl font-semibold">Earnings</h1>
         <p className="text-sm text-vault-muted mt-0.5">Your reward history across all programs</p>
       </div>
+
+      <StripeConnectCard
+        onboardingComplete={profile?.stripe_onboarding_complete ?? false}
+        payoutsEnabled={profile?.stripe_payouts_enabled ?? false}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -115,6 +133,13 @@ export default async function ResearcherRewardsPage() {
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${cfg.cls}`}>
                     {cfg.label}
                   </span>
+                  {r.payout_status && PAYOUT_STATUS_CFG[r.payout_status] && (
+                    <div className="mt-1">
+                      <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${PAYOUT_STATUS_CFG[r.payout_status].cls}`}>
+                        {PAYOUT_STATUS_CFG[r.payout_status].label}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <ChevronRight className="w-4 h-4 text-vault-muted shrink-0 group-hover:text-vault-teal transition-colors" />
               </Link>

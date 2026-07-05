@@ -1,11 +1,28 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, Suspense } from "react";
 import { toast }              from "sonner";
 import { Loader2, Save, Github, Slack, Globe } from "lucide-react";
 import { updateUserSettings } from "@/app/actions/settings";
+import { getGithubInstallationStatus, disconnectGithubApp } from "@/app/actions/github-app";
 import { SectionCard }        from "@/components/settings/section-card";
 import { IntegrationTile }    from "@/components/settings/integration-tile";
+import { useSearchParams }    from "next/navigation";
+
+/** Isolated in its own component + Suspense boundary because Next.js
+ *  requires useSearchParams() to not block the rest of the page render. */
+function GithubCallbackToast() {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const githubParam = searchParams.get("github");
+    if (githubParam === "connected") toast.success("GitHub App connected");
+    if (githubParam === "pending") toast.info("Installation request sent — waiting on GitHub org approval");
+    if (githubParam === "error") toast.error("Failed to connect the GitHub App — please try again");
+  }, [searchParams]);
+
+  return null;
+}
 
 // SVG icons for services not in lucide
 function GitLabIcon() {
@@ -36,9 +53,19 @@ export default function IntegrationsPage() {
   const [slackWebhook, setSlackWebhook]   = useState("");
   const [slackConnected, setSlackConnected] = useState(false);
 
-  // GitHub (OAuth — mock)
+  // GitHub (real GitHub App installation)
   const [githubConnected, setGithubConnected] = useState(false);
   const [githubLogin, setGithubLogin]         = useState("");
+  const [githubLoading, setGithubLoading]     = useState(true);
+
+  useEffect(() => {
+    getGithubInstallationStatus()
+      .then((status) => {
+        setGithubConnected(status.connected);
+        setGithubLogin(status.accountLogin ?? "");
+      })
+      .finally(() => setGithubLoading(false));
+  }, []);
 
   function saveJira() {
     start(async () => {
@@ -78,35 +105,51 @@ export default function IntegrationsPage() {
     setSlackWebhook("");
   }
 
-  function connectGithub() {
-    // In production: redirect to /api/auth/github
-    toast.info("GitHub OAuth flow — configure GITHUB_CLIENT_ID in your .env");
-    setGithubConnected(true);
-    setGithubLogin("demo-user");
+  async function connectGithub() {
+    const appSlug = process.env.NEXT_PUBLIC_GITHUB_APP_SLUG;
+    if (!appSlug) {
+      toast.error("GitHub App isn't configured on this deployment (NEXT_PUBLIC_GITHUB_APP_SLUG missing).");
+      return;
+    }
+    // Redirect to GitHub's install flow — it redirects back to
+    // /api/github/install-callback, which persists the installation.
+    window.location.href = `https://github.com/apps/${appSlug}/installations/new`;
   }
 
   async function disconnectGithub() {
-    await updateUserSettings({ github_token: null });
-    setGithubConnected(false);
-    setGithubLogin("");
-    toast.success("GitHub disconnected");
+    try {
+      await disconnectGithubApp();
+      setGithubConnected(false);
+      setGithubLogin("");
+      toast.success("GitHub App disconnected");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to disconnect");
+    }
   }
 
   return (
     <div className="space-y-5 animate-in">
+      <Suspense fallback={null}>
+        <GithubCallbackToast />
+      </Suspense>
       <SectionCard title="Connected Integrations" description="Link external tools to enhance your workflow">
         <div>
           {/* GitHub */}
           <IntegrationTile
             icon={<Github className="w-4 h-4" />}
             name="GitHub"
-            description="Connect your GitHub account for repository scanning"
+            description="Install the VAULTX GitHub App to scan private repositories"
             connected={githubConnected}
-            connectedInfo={githubConnected ? `Connected as @${githubLogin}` : undefined}
-            onConnect={async () => { connectGithub(); }}
+            connectedInfo={githubConnected ? `Connected to @${githubLogin}` : undefined}
+            onConnect={connectGithub}
             onDisconnect={disconnectGithub}
-            docsUrl="https://docs.github.com/en/apps/oauth-apps"
+            docsUrl="https://docs.github.com/en/apps/using-github-apps/installing-a-github-app-from-github-marketplace-for-your-organizations"
           />
+          {githubLoading && (
+            <div className="px-3 pb-2 text-[11px] text-vault-muted flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" /> Checking installation status…
+            </div>
+          )}
 
           {/* GitLab */}
           <IntegrationTile
@@ -127,14 +170,13 @@ export default function IntegrationsPage() {
             connectedInfo={jiraConnected ? `Connected to ${jiraUrl}` : undefined}
             onDisconnect={disconnectJira}
             configSlot={
-              <form onSubmit={(e) => { e.preventDefault(); saveJira(); }} className="space-y-2">
+              <div className="space-y-2">
                 <div>
                   <label className="block text-xs font-medium mb-1 text-vault-muted">Jira URL</label>
                   <input
                     value={jiraUrl}
                     onChange={(e) => setJiraUrl(e.target.value)}
                     placeholder="https://yourorg.atlassian.net"
-                    autoComplete="off"
                     className="vault-input w-full text-xs"
                   />
                 </div>
@@ -145,15 +187,14 @@ export default function IntegrationsPage() {
                     onChange={(e) => setJiraToken(e.target.value)}
                     type="password"
                     placeholder="Your Jira API token"
-                    autoComplete="current-password"
                     className="vault-input w-full text-xs font-mono"
                   />
                 </div>
-                <button type="submit" disabled={pending} className="btn-teal text-xs flex items-center gap-1 disabled:opacity-40">
+                <button onClick={saveJira} disabled={pending} className="btn-teal text-xs flex items-center gap-1 disabled:opacity-40">
                   {pending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                   Save & Connect
                 </button>
-              </form>
+              </div>
             }
           />
 

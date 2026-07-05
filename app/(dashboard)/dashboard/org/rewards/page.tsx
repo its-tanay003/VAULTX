@@ -6,6 +6,7 @@ import {
   ChevronRight, AlertTriangle,
 } from "lucide-react";
 import { StatCard }        from "@/components/ui/stat-card";
+import { BatchPayButton }  from "@/components/rewards/batch-pay-button";
 import { formatCurrency, formatDate, truncate } from "@/lib/utils";
 import type { Metadata }   from "next";
 import type { RewardStatus } from "@/lib/supabase/types";
@@ -62,9 +63,17 @@ export default async function OrgRewardsPage({ searchParams }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-in">
-      <div>
-        <h1 className="text-xl font-semibold">Rewards</h1>
-        <p className="text-sm text-vault-muted mt-0.5">Manage reward proposals and payments</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Rewards</h1>
+          <p className="text-sm text-vault-muted mt-0.5">Manage reward proposals and payments</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <BatchPayButton approvedRewardIds={totals.approved.map((r) => r.id)} />
+          <Link href="/dashboard/org/payouts" className="text-xs text-vault-teal hover:underline flex items-center gap-1">
+            View payout audit log →
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}

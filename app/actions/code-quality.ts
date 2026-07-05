@@ -17,10 +17,35 @@ import {
   parseGithubUrl, fetchRepoMetadata, fetchRepoTree,
   selectPriorityFiles, selectPrioritySolidityFiles, fetchFiles,
 } from "@/lib/github/client";
+import { getInstallationToken } from "@/lib/github/app-auth";
 import { runCodeQualityScan } from "@/lib/ai/code-review";
 import { runSmartContractAudit } from "@/lib/ai/smart-contract-audit";
 
 const SOL_EXTENSIONS = [".sol"];
+
+/**
+ * Resolves a GitHub App installation token for a repo's owning org, if
+ * one exists. Returns undefined (not an error) when the repo has no
+ * org, or the org never connected the GitHub App — callers fall back
+ * to the existing unauthenticated public-repo path in that case.
+ */
+async function resolveInstallationToken(orgId: string | null): Promise<string | undefined> {
+  if (!orgId) return undefined;
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("github_installations")
+    .select("installation_id")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (!data) return undefined;
+  try {
+    return await getInstallationToken(data.installation_id);
+  } catch (err) {
+    console.error("[Code Quality] Failed to mint installation token, falling back to public access:", err);
+    return undefined;
+  }
+}
 
 /* ─── Connect a public GitHub repo ────────────────────────────────────────── */
 export async function connectRepo(formData: FormData) {
@@ -34,11 +59,12 @@ export async function connectRepo(formData: FormData) {
   const parsed = parseGithubUrl(githubUrl);
   if (!parsed) throw new Error("Invalid GitHub URL — use format: https://github.com/owner/repo");
 
-  const meta = await fetchRepoMetadata(parsed.owner, parsed.repo);
-
   const { data: profile } = await supabase
     .from("profiles").select("org_id, role").eq("id", user.id).single();
   const isOrg = ["org", "triager", "admin"].includes(profile?.role ?? "") && profile?.org_id;
+
+  const installationToken = await resolveInstallationToken(isOrg ? profile.org_id : null);
+  const meta = await fetchRepoMetadata(parsed.owner, parsed.repo, installationToken);
 
   const { data: repo, error } = await supabase
     .from("code_repos")
@@ -88,9 +114,10 @@ export async function runScan(repoId: string): Promise<void> {
   if (!scan) throw new Error("Failed to create scan record");
 
   try {
-    const tree     = await fetchRepoTree(repo.owner_name, repo.repo_name, repo.default_branch);
+    const installationToken = await resolveInstallationToken(repo.org_id);
+    const tree     = await fetchRepoTree(repo.owner_name, repo.repo_name, repo.default_branch, undefined, installationToken);
     const priority = selectPriorityFiles(tree, 8);
-    const files    = await fetchFiles(repo.owner_name, repo.repo_name, repo.default_branch, priority);
+    const files    = await fetchFiles(repo.owner_name, repo.repo_name, repo.default_branch, priority, installationToken);
 
     const result = await runCodeQualityScan(`${repo.owner_name}/${repo.repo_name}`, files);
 
@@ -141,9 +168,10 @@ export async function runWeb3Audit(repoId: string): Promise<void> {
 
   try {
     // Fetch ONLY .sol files using the extended fetchRepoTree()
-    const tree     = await fetchRepoTree(repo.owner_name, repo.repo_name, repo.default_branch, SOL_EXTENSIONS);
+    const installationToken = await resolveInstallationToken(repo.org_id);
+    const tree     = await fetchRepoTree(repo.owner_name, repo.repo_name, repo.default_branch, SOL_EXTENSIONS, installationToken);
     const priority = selectPrioritySolidityFiles(tree, 10);
-    const files    = await fetchFiles(repo.owner_name, repo.repo_name, repo.default_branch, priority);
+    const files    = await fetchFiles(repo.owner_name, repo.repo_name, repo.default_branch, priority, installationToken);
 
     if (files.length === 0) {
       await supabase

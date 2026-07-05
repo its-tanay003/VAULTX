@@ -52,7 +52,7 @@ npm install
      npx supabase login
      npx supabase db push --db-url postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT.supabase.co:5432/postgres
      ```
-   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `014_push_notifications.sql` sequentially inside the Supabase SQL Editor.
+   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `018_stripe_connect_batch2.sql` sequentially inside the Supabase SQL Editor.
 
 #### 3. Setup Environment Variables
 Create `.env.local` based on `.env.example`:
@@ -224,6 +224,45 @@ graph TD
 * **Smart Contract Auditor Submissions**: Auditors submit detailed findings targeting specific lines and files in connected repository scopes.
 * **AI Duplicate Grouper**: Automatically analyzes new submissions during the judging phase and pre-groups them semantically based on root causes, accelerating human review.
 * **Pool Payout Calculator**: Implements the Code4rena model (shares = severity_weight / duplicate_count) to fairly distribute rewards, ensuring duplicate findings split the pool instead of getting rejected. Severity weights: Critical=10, High=5, Medium=2, Low=0.5, Info=0.
+
+### Module 9: Public API
+* **API Key Authentication** (`lib/api/auth.ts`): Validates `Authorization: Bearer vx_...` headers against the existing key store from Settings → API Keys. Keys were being issued and documented before this module existed, but nothing on the server validated them — this is what makes those keys actually functional.
+* **Endpoints**: `GET/POST /api/v1/submissions`, `GET /api/v1/programs`, `GET /api/v1/rewards`, `GET /api/v1/reports` — each gated by one of the five existing scopes (`read:submissions`, `write:submissions`, `read:programs`, `read:rewards`, `read:reports`). Submission creation reuses the exact dedup (SHA-256 exact + pg_trgm fuzzy) and AI validation pipeline as the dashboard form, not a simplified copy.
+* **Rate Limiting** (`lib/api/rate-limit.ts`): Per-key Upstash-backed limits (100 req/hr reads, 20 req/hr writes), same fail-open pattern as the existing submission rate limiter — a Redis outage degrades to unlimited rather than blocking the API entirely.
+* **Docs**: `/docs/api` — public reference page covering auth, rate limits, and every endpoint.
+* **Known gap, not fixed here**: the underlying key hash (`app/actions/settings.ts`) is a single unsalted SHA-256, not the salted double-hash described in migration 012's comments for a separate, currently-unused `public.api_keys` table. Low practical risk given keys are 32 random bytes (high entropy), but worth migrating to the salted scheme in a future hardening pass.
+
+### Module 10: GitHub App Integration (Private Repos)
+* **Auth primitives** (`lib/github/app-auth.ts`): RS256 JWT signing via Web Crypto and installation-token exchange. Enables code quality scans and Web3 audits to authenticate as a specific org's GitHub App installation instead of only hitting GitHub's unauthenticated public API.
+* **Install flow** (`app/api/github/install-callback/route.ts`): Handles GitHub's redirect after a user installs the App, persisting the installation record (`github_installations`, migration 016) scoped to the org owner. Distinguishes a completed install from a pending admin-approval request (`setup_action=request`).
+* **Private repo scanning, end to end**: `lib/github/client.ts`'s `fetchRepoTree`/`fetchFileContent`/`fetchFiles` now accept an optional installation token — previously only `fetchRepoMetadata` did, so a connected org's private-repo metadata check would pass but the actual tree/file fetch immediately after would silently fail. `app/actions/code-quality.ts` resolves the calling org's installation token automatically for both the general scanner and the Web3 auditor.
+### Module 11: Performance Engineering CI/CD
+Explicitly listed as a hard cut in the original blueprint ("DO NOT BUILD"). Built as a from-scratch addition, not an upgrade of any prior partial work.
+* **`.github/workflows/performance-ci.yml`**: Runs on every PR into main. Builds the plain Next.js output (not the Cloudflare Worker bundle — irrelevant overhead for this check), serves it locally, and runs both a bundle-size budget check and Lighthouse CI against it.
+* **`scripts/check-bundle-size.js`**: Parses Next.js's own build manifest to enforce a per-route First Load JS budget (300 KB default, with named exceptions for routes with justified extra weight, e.g. the PTaaS report panel pulling in `pdf-lib`). This is static analysis of build output, so it covers every route including authenticated dashboard pages — unlike the Lighthouse step below.
+* **`lighthouserc.json`**: Lighthouse only runs against the landing page and `/docs/api` — the only unauthenticated routes a CI runner can render without live Supabase credentials. Enforces performance ≥ 0.85, accessibility ≥ 0.90, plus Core Web Vitals thresholds (LCP ≤ 2.5s, CLS ≤ 0.1).
+* **Honest scope limit**: this does not performance-test the authenticated dashboard itself (submissions list, PTaaS engagement pages, etc.) — doing that in CI would require seeding a real or mocked Supabase instance with test data and a way to authenticate a headless browser, which is a meaningfully larger effort than "add Lighthouse to CI." Flagging this rather than implying broader coverage than what's actually running.
+
+### Module 12: Stripe Connect Payouts (Complete — Batches 1 & 2)
+Requested as a full 12-feature build, delivered across two batches given the scope and the fact that this touches real money movement.
+
+**Batch 1 (core):**
+* **Migration 017**: purely additive — does not touch the `reward_status` enum or the `enforce_human_reward_approval` trigger from migration 001.
+* **`lib/stripe/client.ts`**: Express Connect account creation, onboarding links, and transfers. Every transfer requires an idempotency key — a retried request can never create a duplicate real transfer.
+* **Researcher onboarding**: `app/actions/stripe-connect.ts`, `/api/stripe/onboarding-return`, Stripe status card on the Earnings page.
+* **`markRewardPaid` now moves real money** via `stripe.transfers.create`, but every existing guard (org-owner-only, `status === 'approved'` required) is untouched — it still never sets a reward to approved, only ever acts on rewards that already cleared that human-gated transition.
+* **Real bug found and fixed**: `components/rewards/reward-widget.tsx` — the entire propose/approve/pay UI — was built but never rendered on any page. Wired into the org submission detail page; without this, none of the reward/payout logic was reachable by a human.
+
+**Batch 2 (remaining 8 features):**
+* **Migration 018**: `reward_splits` table, `profiles.minimum_payout_threshold`, `rewards.held_for_threshold`, `payout_fraud_flags` — all additive.
+* **Minimum payout threshold**: `markRewardPaid` now pools a researcher's cumulative unpaid-approved rewards (same currency) and only transfers once the pool crosses their threshold ($50 default), combining everything held into one transfer rather than many small ones. Split-configured rewards are excluded from pooling by design — combining per-researcher threshold pooling with multi-recipient splitting on one reward would be a meaningfully larger feature for uncertain benefit.
+* **Payout splitting**: `proposeSplitReward()` + `paySplitReward()` — each split recipient gets their own transfer with its own idempotency key, so a partial failure (one recipient's Stripe not connected) can be retried without re-paying recipients who already succeeded.
+* **Batch payouts**: `batchPayRewards()` + a "Pay all approved" button on the org rewards page. Runs sequentially, not concurrently — concurrent calls risk the same researcher's rewards being pooled twice by two overlapping reads of stale state.
+* **Failed payout handling**: retry cap (5 attempts, then blocked with a clear message), org-owner email alert on every failure (`notifyPayoutFailed`), researcher email receipt on every success (`notifyPayoutSucceeded`).
+* **Admin payout audit log**: `/dashboard/org/payouts` — reads directly from the existing immutable `audit_logs` table (migration 001). No new logging mechanism; this is a dedicated view over data that was already being written.
+* **Fraud detection**: `lib/stripe/fraud.ts` scans for researchers whose connected Stripe accounts share a bank account fingerprint — a real signal from Stripe's own data, not a fabricated ML model. Deliberately narrow in scope; a genuine payments fraud system (velocity checks, device fingerprinting, behavioral scoring) is its own project, not something to imply coverage of here.
+* **Multi-currency**: `lib/currency/convert.ts` provides a live USD-equivalent estimate (via frankfurter.app, free/keyless, ECB reference rates) for display purposes only — it does not affect what Stripe actually transfers. Stripe handles real cross-currency conversion itself at payout time using its own live rates; duplicating that logic here would risk the displayed estimate silently drifting from what the researcher actually receives.
+* **Tax form collection — deliberately not built as a separate custom flow**: Stripe's own Express onboarding (already live in Batch 1) collects identity, banking, and tax information (W-9/W-8BEN equivalents) as part of its standard hosted KYC flow — `stripe_payouts_enabled` only becomes true once Stripe's own requirements are satisfied, which already gates the first payout on this being complete. Building a parallel custom tax-form collector would mean VAULTX itself handling and storing raw SSNs/TINs directly, which is a serious compliance liability for a zero-budget platform to take on when Stripe already solves it. Flagging this as a deliberate design decision, not a shortcut.
 
 ---
 
