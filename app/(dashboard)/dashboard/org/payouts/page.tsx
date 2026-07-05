@@ -56,7 +56,23 @@ export default async function PayoutAuditLogPage() {
     };
   });
 
-  const all = entries ?? [];
+  const all = (entries ?? []).map((e) => {
+    const actor = Array.isArray(e.profiles) ? e.profiles[0] : e.profiles;
+    const after = (e.after as Record<string, unknown>) ?? {};
+    return {
+      id: e.id,
+      actor_id: e.actor_id,
+      action: e.action,
+      entity_id: e.entity_id,
+      ip: e.ip,
+      created_at: e.created_at,
+      actorName: (actor as any)?.full_name ?? (actor as any)?.username ?? "Unknown",
+      reason: after.reason ? String(after.reason) : null,
+      stripe_transfer_id: after.stripe_transfer_id ? String(after.stripe_transfer_id) : null,
+      total: after.total !== undefined ? String(after.total) : null,
+      currency: after.currency ? String(after.currency) : null,
+    };
+  });
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-in">
@@ -82,8 +98,6 @@ export default async function PayoutAuditLogPage() {
         <div className="vault-card divide-y divide-vault-border">
           {all.map((entry) => {
             const cfg = ACTION_CFG[entry.action] ?? { label: entry.action, icon: <ScrollText className="w-3.5 h-3.5" />, cls: "text-vault-muted" };
-            const actor = Array.isArray(entry.profiles) ? entry.profiles[0] : entry.profiles;
-            const after = (entry.after as Record<string, unknown>) ?? {};
 
             return (
               <div key={entry.id} className="p-4 flex items-start gap-3">
@@ -94,18 +108,18 @@ export default async function PayoutAuditLogPage() {
                   <div className="flex items-center gap-2">
                     <p className={`text-sm font-medium ${cfg.cls}`}>{cfg.label}</p>
                     <span className="text-xs text-vault-muted">
-                      by {actor?.full_name ?? actor?.username ?? "Unknown"}
+                      by {entry.actorName}
                     </span>
                   </div>
-                  {after.reason && <p className="text-xs text-red-300 mt-1">{String(after.reason)}</p>}
-                  {after.stripe_transfer_id && (
+                  {entry.reason && <p className="text-xs text-red-300 mt-1">{entry.reason}</p>}
+                  {entry.stripe_transfer_id && (
                     <p className="text-xs text-vault-muted mt-1 font-mono">
-                      Transfer: {String(after.stripe_transfer_id)}
+                      Transfer: {entry.stripe_transfer_id}
                     </p>
                   )}
-                  {after.total !== undefined && after.currency && (
+                  {entry.total && entry.currency && (
                     <p className="text-xs text-vault-muted mt-1">
-                      {String(after.total)} {String(after.currency)}
+                      {entry.total} {entry.currency}
                     </p>
                   )}
                   <p className="text-[11px] text-vault-muted mt-1">{formatDate(entry.created_at)}</p>

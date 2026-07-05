@@ -351,11 +351,11 @@ export function ReportBuilder({ programs, researchers, initialTemplates }: Props
               <div ref={(el) => { chartRefs.current[key] = el; }} style={{ width: "100%", height: 260 }}>
                 <ResponsiveContainer>{renderChart(key as MetricKey, series)}</ResponsiveContainer>
               </div>
-              {comparison?.[key] && (
+              {!!(comparison && (comparison as Record<string, unknown>)[key]) && (
                 <div className="mt-2 pt-2 border-t border-vault-border">
                   <p className="text-[10px] text-vault-muted mb-1">Prior period</p>
                   <div style={{ width: "100%", height: 140 }}>
-                    <ResponsiveContainer>{renderChart(key as MetricKey, comparison[key] as any)}</ResponsiveContainer>
+                    <ResponsiveContainer>{renderChart(key as MetricKey, (comparison as Record<string, any>)[key])}</ResponsiveContainer>
                   </div>
                 </div>
               )}
