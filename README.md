@@ -52,7 +52,7 @@ npm install
      npx supabase login
      npx supabase db push --db-url postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT.supabase.co:5432/postgres
      ```
-   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `018_stripe_connect_batch2.sql` sequentially inside the Supabase SQL Editor.
+   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `019_reporting_builder.sql` sequentially inside the Supabase SQL Editor.
 
 #### 3. Setup Environment Variables
 Create `.env.local` based on `.env.example`:
@@ -263,6 +263,17 @@ Requested as a full 12-feature build, delivered across two batches given the sco
 * **Fraud detection**: `lib/stripe/fraud.ts` scans for researchers whose connected Stripe accounts share a bank account fingerprint — a real signal from Stripe's own data, not a fabricated ML model. Deliberately narrow in scope; a genuine payments fraud system (velocity checks, device fingerprinting, behavioral scoring) is its own project, not something to imply coverage of here.
 * **Multi-currency**: `lib/currency/convert.ts` provides a live USD-equivalent estimate (via frankfurter.app, free/keyless, ECB reference rates) for display purposes only — it does not affect what Stripe actually transfers. Stripe handles real cross-currency conversion itself at payout time using its own live rates; duplicating that logic here would risk the displayed estimate silently drifting from what the researcher actually receives.
 * **Tax form collection — deliberately not built as a separate custom flow**: Stripe's own Express onboarding (already live in Batch 1) collects identity, banking, and tax information (W-9/W-8BEN equivalents) as part of its standard hosted KYC flow — `stripe_payouts_enabled` only becomes true once Stripe's own requirements are satisfied, which already gates the first payout on this being complete. Building a parallel custom tax-form collector would mean VAULTX itself handling and storing raw SSNs/TINs directly, which is a serious compliance liability for a zero-budget platform to take on when Stripe already solves it. Flagging this as a deliberate design decision, not a shortcut.
+
+### Module 13: Custom Reporting Builder
+Requested as a 15-feature build; all 15 implemented in one pass since the metrics engine, filters, and chart rendering share one clean core that the remaining features (export, scheduling, embed, anomalies) layer onto directly.
+* **Migration 019**: `report_templates` (saved builder configs, optional public embed token) and `scheduled_reports` (recurring email delivery), both additive.
+* **`lib/reports/metrics.ts`**: nine metrics — bugs submitted/resolved, severity distribution, payout totals, avg response time, researcher activity, researcher leaderboard, program cost-per-finding, SLA compliance — all computed from one shared `ReportFilters` shape so the live builder, the public embed route, and the scheduled-report cron all produce identical numbers from identical inputs.
+* **Two labeled approximations, not silently overclaimed**: "avg response time" and SLA compliance use `updated_at - created_at` as a proxy for first-triage response time, since no dedicated "first response" timestamp exists in the schema — genuinely approximate, not exact SLA timing. "Program ROI" is actually total payout ÷ valid findings (a cost-per-finding proxy) — there's no real revenue figure anywhere in this schema to compute true financial ROI against.
+* **Builder UI** (`/dashboard/org/reports`): metric picker, chart type (bar/line/pie; scatter falls back to bar since the underlying data is label/value pairs, not true x/y numeric pairs), date presets + custom range, severity/program/researcher filters, comparison mode (current vs. prior period, side-by-side), one-click presets for Executive Summary / Researcher Leaderboard / SLA Compliance.
+* **Anomaly highlights** (`lib/reports/anomaly.ts`): standard-deviation based (>2σ from series mean) — a real, explainable statistical signal, not a machine-learning model, appropriate for a feature where a human needs to understand *why* something was flagged.
+* **Export**: CSV (client-side, no dependency) and PNG (SVG-to-canvas serialization of the actual rendered recharts output, also no extra dependency — avoided pulling in html2canvas/dom-to-image for something achievable natively since recharts renders pure SVG).
+* **Embed links**: `/r/[token]` — public, unauthenticated, outside the `(dashboard)` route group entirely. Deliberately restricted to four metrics (bugs submitted/resolved, severity distribution, payout totals) even if the source template includes others — researcher leaderboard and activity are excluded from every embed regardless of template config, since a client-facing public link shouldn't expose which named researcher found what or their individual earnings.
+* **Scheduled reports**: `.github/workflows/scheduled-reports-cron.yml` + `/api/cron/scheduled-reports`, reusing the exact `x-vault-secret` header auth and GitHub Actions schedule pattern already established by `red-team-cron.yml` — no new infrastructure pattern introduced. Emails a text/list summary rather than embedding rendered charts, since that's more reliable across email clients than shipping SVG in an email and avoids a server-side chart-rendering dependency for a job that runs at most twice a month.
 
 ---
 

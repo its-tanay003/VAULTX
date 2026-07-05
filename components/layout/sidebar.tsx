@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   ShieldCheck, LayoutDashboard, Target, Bug, FileSearch,
   Trophy, Settings, LogOut, ChevronLeft, ChevronRight,
-  Code2, Bell, BarChart3, Shield, Zap, Flag, Scale,
+  Code2, Bell, BarChart3, Shield, Zap, Flag, Scale, FileBarChart,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn }            from "@/lib/utils";
@@ -31,6 +31,7 @@ const ORG_CORE = [
   { href: "/dashboard/org/programs",    icon: Target,          label: "Programs"    },
   { href: "/dashboard/org/submissions", icon: Bug,             label: "Submissions" },
   { href: "/dashboard/org/rewards",     icon: Trophy,          label: "Rewards"     },
+  { href: "/dashboard/org/reports",     icon: FileBarChart,    label: "Reports"     },
 ];
 
 const ORG_SECURITY = [

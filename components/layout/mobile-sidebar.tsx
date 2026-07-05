@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ShieldCheck, LayoutDashboard, Target, Bug, FileSearch,
   Trophy, Settings, LogOut, Menu, X, BarChart3, Code2,
-  Bell, Shield, Zap, Flag, Scale,
+  Bell, Shield, Zap, Flag, Scale, FileBarChart,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn }            from "@/lib/utils";
@@ -18,6 +18,7 @@ const ORG_NAV = [
   { href: "/dashboard/org/programs",    icon: Target,          label: "Programs" },
   { href: "/dashboard/org/submissions", icon: Bug,             label: "Submissions" },
   { href: "/dashboard/org/rewards",     icon: Trophy,          label: "Rewards" },
+  { href: "/dashboard/org/reports",     icon: FileBarChart,    label: "Reports" },
   { href: "/dashboard/ptaas",           icon: Shield,          label: "PTaaS" },
   { href: "/dashboard/code-quality",    icon: Code2,           label: "Code Quality" },
   { href: "/dashboard/ai-red-team",     icon: Zap,             label: "AI Red Team" },

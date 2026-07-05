@@ -1,0 +1,40 @@
+name: Scheduled Reports
+
+# Runs daily at 07:00 UTC — the route itself decides whether anything is
+# actually due (Mondays for weekly, the 1st for monthly), so a daily
+# trigger with an internal no-op is simpler and more resilient than
+# maintaining two separate cron schedules that both need to stay in sync
+# with "weekly = Monday" / "monthly = the 1st." Same zero-budget
+# reasoning as red-team-cron.yml — free on GitHub Actions.
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  send-scheduled-reports:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger scheduled report delivery
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X GET \
+            "${{ secrets.VAULT_APP_URL }}/api/cron/scheduled-reports" \
+            -H "x-vault-secret: ${{ secrets.VAULT_INTERNAL_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "Response: $body"
+          echo "HTTP status: $http_code"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::Scheduled report trigger failed with status $http_code"
+            exit 1
+          fi
+
+# ─── Setup required ─────────────────────────────────────────────────────────
+# Reuses the same VAULT_APP_URL and VAULT_INTERNAL_SECRET repository
+# secrets already configured for red-team-cron.yml — no new secrets needed
+# if that workflow is already set up.
