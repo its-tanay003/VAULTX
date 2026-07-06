@@ -5,6 +5,8 @@ import { Header }  from "@/components/layout/header";
 import { PageTransition }          from "@/components/providers/page-transition";
 import { CommandPaletteProvider }  from "@/components/providers/command-palette-provider";
 import { SkipToContent }           from "@/components/ui/skip-to-content";
+import { VaultContextProvider }    from "@/components/vault/vault-context";
+import { VaultWidget }             from "@/components/vault/vault-widget";
 
 /**
  * UPDATED Week 7 (final):
@@ -31,21 +33,24 @@ export default async function DashboardLayout({
 
   return (
     <CommandPaletteProvider role={profile.role}>
-      <SkipToContent />
-      <div className="flex h-screen bg-vault-bg overflow-hidden">
-        <Sidebar
-          role={profile.role}
-          fullName={profile.full_name}
-          email={profile.email}
-          avatarUrl={profile.avatar_url}
-        />
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <Header profile={profile} />
-          <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-4 sm:p-6 outline-none">
-            <PageTransition>{children}</PageTransition>
-          </main>
+      <VaultContextProvider>
+        <SkipToContent />
+        <div className="flex h-screen bg-vault-bg overflow-hidden">
+          <Sidebar
+            role={profile.role}
+            fullName={profile.full_name}
+            email={profile.email}
+            avatarUrl={profile.avatar_url}
+          />
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            <Header profile={profile} />
+            <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-4 sm:p-6 outline-none">
+              <PageTransition>{children}</PageTransition>
+            </main>
+          </div>
         </div>
-      </div>
+        <VaultWidget role={profile.role === "researcher" ? "researcher" : "admin"} />
+      </VaultContextProvider>
     </CommandPaletteProvider>
   );
 }

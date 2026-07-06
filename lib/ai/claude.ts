@@ -201,7 +201,152 @@ async function callGemini(opts: CallOptions): Promise<AIMessage> {
   };
 }
 
-/* ─── Parse JSON from a response (provider-agnostic — works for both) ────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Streaming entry point (added for the VAULT agent's chat UI)
+ *
+ * Kept in this same file rather than a separate implementation, per the
+ * platform's standing AI-integration rule: every call site should be
+ * multi-provider without duplicating fallback logic. streamClaude()
+ * mirrors callClaude()'s Claude-primary/Gemini-fallback strategy, with
+ * one necessary difference: the fallback can only happen if the
+ * Claude request fails before any chunk has been yielded. Once
+ * streaming has started and reached the client, silently switching
+ * providers mid-response isn't possible without confusing whatever's
+ * consuming the stream — a genuine failure after that point surfaces
+ * as an error chunk instead.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+export interface StreamCallOptions extends CallOptions {
+  history?: { role: "user" | "assistant"; content: string }[];
+}
+
+/** Async generator yielding text chunks as they arrive. Consumers `for await` this directly. */
+export async function* streamClaude(opts: StreamCallOptions): AsyncGenerator<string> {
+  let yieldedAny = false;
+  try {
+    for await (const chunk of streamAnthropic(opts)) {
+      yieldedAny = true;
+      yield chunk;
+    }
+  } catch (claudeErr) {
+    if (yieldedAny) {
+      const msg = claudeErr instanceof Error ? claudeErr.message : String(claudeErr);
+      yield `\n\n[Connection interrupted: ${msg}]`;
+      return;
+    }
+    console.warn("[AI Stream] Claude failed before first chunk, falling back to Gemini:", claudeErr);
+    yield* streamGemini(opts);
+  }
+}
+
+async function* streamAnthropic(opts: StreamCallOptions): AsyncGenerator<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
+
+  const messages = [...(opts.history ?? []), { role: "user" as const, content: opts.user }];
+
+  const res = await fetch(ANTHROPIC_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: opts.maxTokens ?? MAX_TOKENS,
+      system: opts.system,
+      messages,
+      stream: true,
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+    }),
+  });
+
+  if (!res.ok || !res.body) {
+    const errText = await res.text().catch(() => res.statusText);
+    throw new Error(`Claude streaming API error ${res.status}: ${errText}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const payload = line.slice(6);
+      if (payload === "[DONE]") return;
+
+      try {
+        const event = JSON.parse(payload);
+        if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+          yield event.delta.text as string;
+        }
+      } catch {
+        // Malformed SSE chunk — skip it rather than aborting the whole stream.
+      }
+    }
+  }
+}
+
+async function* streamGemini(opts: StreamCallOptions): AsyncGenerator<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not configured — no streaming fallback available");
+
+  const streamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+  const contents = [
+    ...(opts.history ?? []).map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+    { role: "user", parts: [{ text: opts.user }] },
+  ];
+
+  const res = await fetch(streamUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: opts.system }] },
+      contents,
+      generationConfig: { maxOutputTokens: opts.maxTokens ?? MAX_TOKENS, ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}) },
+    }),
+  });
+
+  if (!res.ok || !res.body) {
+    const errText = await res.text().catch(() => res.statusText);
+    throw new Error(`Gemini streaming API error ${res.status}: ${errText}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      try {
+        const event = JSON.parse(line.slice(6));
+        const text = event?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("");
+        if (text) yield text;
+      } catch {
+        // Skip malformed chunk
+      }
+    }
+  }
+}
+
 export function parseJsonResponse<T>(message: AIMessage): T {
   const text = message.content
     .filter((b) => b.type === "text")

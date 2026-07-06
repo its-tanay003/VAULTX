@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { TriageActions }     from "@/components/submissions/triage-actions";
 import { RewardWidget }      from "@/components/rewards/reward-widget";
+import { VaultContextSetter } from "@/components/vault/vault-context-setter";
 import { AIConfidenceBar }   from "@/components/submissions/ai-confidence-bar";
 import { RealtimeSubmissionStatus } from "@/components/realtime/realtime-submission-status";
 import { formatDate, formatRelativeTime } from "@/lib/utils";
@@ -97,6 +98,7 @@ export default async function OrgSubmissionDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-5 animate-in">
+      <VaultContextSetter page="submission_detail" submissionId={sub.id} programId={program?.id} researcherId={researcher?.id} />
       {/* Header */}
       <div className="flex items-start gap-3">
         <Link href="/dashboard/org/submissions" className="text-vault-muted hover:text-vault-text mt-1">
