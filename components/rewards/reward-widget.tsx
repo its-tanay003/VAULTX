@@ -186,7 +186,7 @@ export function RewardWidget({ submissionId, existingReward, minReward, maxRewar
       </div>
 
       {existingReward.note && (
-        <p className="text-sm text-vault-muted mb-4 italic">"{existingReward.note}"</p>
+        <p className="text-sm text-vault-muted mb-4 italic">&quot;{existingReward.note}&quot;</p>
       )}
 
       <div className="space-y-1.5 text-xs text-vault-muted mb-4">
@@ -251,8 +251,8 @@ export function RewardWidget({ submissionId, existingReward, minReward, maxRewar
             <div className="flex gap-2 bg-blue-950/30 border border-blue-900/40 rounded-lg p-3">
               <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
               <p className="text-[11px] text-blue-300 leading-relaxed">
-                Held — this researcher's unpaid approved total hasn't reached their minimum payout
-                threshold yet. It'll be included automatically in their next payout once it does.
+                Held — this researcher&apos;s unpaid approved total hasn&apos;t reached their minimum payout
+                threshold yet. It&apos;ll be included automatically in their next payout once it does.
               </p>
             </div>
           )}

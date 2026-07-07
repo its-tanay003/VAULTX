@@ -76,7 +76,7 @@ export default function ApiDocsPage() {
           </pre>
           <p className="text-xs text-vault-muted">
             Keys are shown once at creation — store them securely. Each key is scoped to specific
-            permissions chosen when you create it; a request against an endpoint your key isn't
+            permissions chosen when you create it; a request against an endpoint your key isn&apos;t
             scoped for returns <code className="font-mono bg-vault-elevated px-1 rounded">403</code>.
           </p>
         </section>
@@ -116,7 +116,7 @@ export default function ApiDocsPage() {
         </section>
 
         <section className="text-xs text-vault-muted border-t border-vault-border pt-6">
-          Need a scope that doesn't exist yet, or hit a limit that's too tight for a legitimate
+          Need a scope that doesn&apos;t exist yet, or hit a limit that&apos;s too tight for a legitimate
           use case? Reach out — this API surface grows based on real integration needs, not
           speculative coverage.
         </section>

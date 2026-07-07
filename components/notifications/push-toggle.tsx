@@ -8,11 +8,16 @@ import { SettingsToggle } from "@/components/settings/section-card";
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
 /** Converts a URL-safe base64 VAPID key into the Uint8Array format the Push API expects. */
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+  // `new Uint8Array(length)` (as opposed to Uint8Array.from()) is typed by
+  // modern lib.dom.d.ts as Uint8Array<ArrayBuffer> specifically, which is
+  // what PushManager.subscribe()'s applicationServerKey (BufferSource) needs.
+  const bytes = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) bytes[i] = rawData.charCodeAt(i);
+  return bytes;
 }
 
 type SupportState = "checking" | "unsupported" | "supported";
@@ -84,7 +89,7 @@ export function PushNotificationToggle() {
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!) as unknown as ArrayBuffer,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
       });
     }
 

@@ -20,7 +20,7 @@
 -- ============================================================
 
 create type contest_status   as enum ('draft','open','judging','complete','archived');
-create type finding_status   as enum ('submitted','valid','invalid','duplicate');
+create type contest_finding_status as enum ('submitted','valid','invalid','duplicate');
 create type judging_outcome  as enum ('unique','duplicate_of');
 
 -- ── Contests ─────────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ create table contest_findings (
   impact            text,
   suggested_fix     text,
   affected_files    text[],         -- array of file paths
-  status            finding_status  not null default 'submitted',
+  status            contest_finding_status  not null default 'submitted',
   -- Judging fields (filled during judging phase)
   judging_outcome   judging_outcome,
   duplicate_of      uuid            references contest_findings(id),

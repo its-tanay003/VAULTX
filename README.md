@@ -287,7 +287,18 @@ Requested as ~24 distinct capabilities across two personas. Built as one unified
 
 ---
 
+### Verification Pass (post-Module 14)
+Ran the actual migration chain (001→020) against a real Postgres instance, ran `tsc --noEmit`, and ran `next lint` — not a code-review pass, an execution pass. Found and fixed real bugs:
+* **Deployment-blocking bug, pre-dates this session entirely**: migration `011_audit_contests.sql` declared `create type finding_status` — but migration `007_ptaas.sql` (Week 10) already created an enum with that exact name for a completely different concept (PTaaS finding lifecycle vs. contest finding lifecycle). This would have failed on `011` on any fresh database, blocking every migration after it — meaning 012 through 020, everything built this session included, could never have been applied to a clean project. Renamed the contest-specific enum to `contest_finding_status`; no application code referenced the type name directly, so this was a safe, contained fix.
+* **6 real TypeScript errors from this session's code**, all fixed: three `unknown`-typed values rendered directly in JSX conditionals (`{after.reason && ...}` where `after: Record<string, unknown>` — fixed by wrapping in `Boolean()` so the conditional has a valid boolean type instead of `unknown`), and two `Uint8Array<ArrayBufferLike>` vs. `BufferSource`/`ArrayBuffer` mismatches from newer TypeScript lib.dom typings (`Uint8Array.from()` and pdf-lib's `.save()` aren't narrowed to a concrete `ArrayBuffer`-backed type the way `new Uint8Array(length)` is) in the push notification subscription and the PDF integrity hash.
+* **`npm run lint` had never actually worked** — `eslint`/`eslint-config-next` were devDependencies and a `lint` script existed, but no `.eslintrc.json` was ever committed, so running it just prompted for interactive setup. Added a standard `next/core-web-vitals` config. Once it could actually run, it surfaced real (mostly pre-existing, mostly unescaped-quote) issues across dozens of files from earlier weeks — fixed the 2 files this session touched (`reward-widget.tsx`, `docs/api/page.tsx`), left the pre-existing project-wide backlog as a reported inventory rather than silently bulk-editing unrelated files outside this session's scope.
+* **Confirmed NOT a bug, checked rather than assumed**: the Supabase client is typed as `SupabaseClient<Database, "public", any>` — the `any` schema parameter means `.from()` calls against tables missing from `lib/supabase/types.ts` (which is true for most tables added since migration ~006, not just this session's) don't actually fail type-checking. Worth knowing that `types.ts` is significantly out of date with the real schema, but it isn't currently causing build failures.
+
+---
+
 ## 4. SYSTEM ARCHITECTURE
+
+
 
 ```mermaid
 sequenceDiagram
