@@ -10,6 +10,7 @@ import { AggressionBadge }     from "@/components/red-team/aggression-badge";
 import { ReasoningTrace }      from "@/components/red-team/reasoning-trace";
 import { formatRelativeTime, formatDate } from "@/lib/utils";
 import type { Metadata }       from "next";
+import { VaultContextSetter } from "@/components/vault/vault-context-setter";
 
 interface Props { params: { id: string } }
 
@@ -63,6 +64,7 @@ export default async function TargetDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 animate-in">
+      <VaultContextSetter page="red_team_target_detail" targetId={target.id} />
       <div className="flex items-start gap-3">
         <Link href="/dashboard/ai-red-team" className="text-vault-muted hover:text-vault-text transition-colors mt-1">
           <ChevronLeft className="w-4 h-4" />
@@ -129,7 +131,7 @@ export default async function TargetDetailPage({ params }: Props) {
             ))}
           </div>
           <p className="text-[11px] text-vault-muted mt-3 pt-3 border-t border-vault-border">
-            These are real submissions in your normal triage queue — accept, reject, or request more info exactly as you would for a human researcher's report.
+            These are real submissions in your normal triage queue — accept, reject, or request more info exactly as you would for a human researcher&apos;s report.
           </p>
         </div>
       )}

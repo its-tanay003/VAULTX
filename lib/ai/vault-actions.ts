@@ -25,10 +25,11 @@
  */
 
 import { runScan, runWeb3Audit } from "@/app/actions/code-quality";
+import { triggerScan as triggerRedTeamScan } from "@/app/actions/red-team";
 import { generateEngagementReportPdf } from "@/lib/ptaas/report-generation";
 import type { UserRole } from "@/lib/supabase/types";
 
-export type ActionType = "trigger_code_scan" | "trigger_web3_audit" | "generate_ptaas_report";
+export type ActionType = "trigger_code_scan" | "trigger_web3_audit" | "generate_ptaas_report" | "trigger_red_team_scan";
 
 export interface ActionDefinition {
   type: ActionType;
@@ -55,6 +56,17 @@ export const ACTION_REGISTRY: Record<ActionType, ActionDefinition> = {
     allowedRoles: ["admin", "org", "triager"],
     paramSchema: { engagementId: "string" },
     describe: () => "Generate the signed PDF pentest report for this engagement.",
+  },
+  trigger_red_team_scan: {
+    type: "trigger_red_team_scan",
+    // Narrower than the other actions on purpose: the underlying
+    // triggerScan() action checks organizations.owner_id === caller
+    // specifically, not general org membership — matching that here
+    // rather than offering the action to roles that would just hit a
+    // 403 from the real check anyway.
+    allowedRoles: ["org", "admin"],
+    paramSchema: { targetId: "string" },
+    describe: () => "Run an AI Red Team scan against this already-authorized target.",
   },
 };
 
@@ -109,6 +121,10 @@ export async function executeAction(type: ActionType, params: Record<string, str
       case "generate_ptaas_report": {
         const { filename, sha256 } = await generateEngagementReportPdf(params.engagementId);
         return { success: true, result: { filename, sha256, downloadUrl: `/api/ptaas/${params.engagementId}/report-pdf` } };
+      }
+      case "trigger_red_team_scan": {
+        await triggerRedTeamScan(params.targetId);
+        return { success: true, result: { targetId: params.targetId, message: "Red Team scan started" } };
       }
       default:
         return { success: false, error: "Unknown action type" };

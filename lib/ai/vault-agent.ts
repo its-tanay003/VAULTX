@@ -26,6 +26,7 @@ export interface VaultContext {
   researcherId?:  string;
   repoId?:        string;
   engagementId?:  string;
+  targetId?:      string;
 }
 
 const RESEARCHER_PERSONA = `You are VAULT, VAULTX's resident AI security intelligence agent, talking to a security researcher.
@@ -120,6 +121,13 @@ export async function gatherContextData(context: VaultContext): Promise<string> 
     const { data: engagement } = await supabase.from("pentest_engagements").select("name").eq("id", context.engagementId).single();
     if (engagement) {
       parts.push(`Currently viewing PTaaS engagement: "${engagement.name}" (id: ${context.engagementId} — use this exact id for any report action on this engagement).`);
+    }
+  }
+
+  if (context.targetId) {
+    const { data: target } = await supabase.from("red_team_targets").select("domain, is_active").eq("id", context.targetId).single();
+    if (target) {
+      parts.push(`Currently viewing AI Red Team target: ${target.domain} (id: ${context.targetId}, active: ${target.is_active} — use this exact id for any scan action on this target).`);
     }
   }
 

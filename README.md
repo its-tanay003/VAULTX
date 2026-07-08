@@ -52,7 +52,7 @@ npm install
      npx supabase login
      npx supabase db push --db-url postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT.supabase.co:5432/postgres
      ```
-   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `020_vault_agent.sql` sequentially inside the Supabase SQL Editor.
+   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `021_vault_agent_mode.sql` sequentially inside the Supabase SQL Editor.
 
 #### 3. Setup Environment Variables
 Create `.env.local` based on `.env.example`:
@@ -293,6 +293,15 @@ Ran the actual migration chain (001→020) against a real Postgres instance, ran
 * **6 real TypeScript errors from this session's code**, all fixed: three `unknown`-typed values rendered directly in JSX conditionals (`{after.reason && ...}` where `after: Record<string, unknown>` — fixed by wrapping in `Boolean()` so the conditional has a valid boolean type instead of `unknown`), and two `Uint8Array<ArrayBufferLike>` vs. `BufferSource`/`ArrayBuffer` mismatches from newer TypeScript lib.dom typings (`Uint8Array.from()` and pdf-lib's `.save()` aren't narrowed to a concrete `ArrayBuffer`-backed type the way `new Uint8Array(length)` is) in the push notification subscription and the PDF integrity hash.
 * **`npm run lint` had never actually worked** — `eslint`/`eslint-config-next` were devDependencies and a `lint` script existed, but no `.eslintrc.json` was ever committed, so running it just prompted for interactive setup. Added a standard `next/core-web-vitals` config. Once it could actually run, it surfaced real (mostly pre-existing, mostly unescaped-quote) issues across dozens of files from earlier weeks — fixed the 2 files this session touched (`reward-widget.tsx`, `docs/api/page.tsx`), left the pre-existing project-wide backlog as a reported inventory rather than silently bulk-editing unrelated files outside this session's scope.
 * **Confirmed NOT a bug, checked rather than assumed**: the Supabase client is typed as `SupabaseClient<Database, "public", any>` — the `any` schema parameter means `.from()` calls against tables missing from `lib/supabase/types.ts` (which is true for most tables added since migration ~006, not just this session's) don't actually fail type-checking. Worth knowing that `types.ts` is significantly out of date with the real schema, but it isn't currently causing build failures.
+
+### Module 15: VAULT Agent Mode (First Slice)
+Design doc: `vault-agent-mode-design.md`. Confirm-before-execute layer — VAULT proposes an action, a user explicitly confirms, only then does anything execute. No parallel privileged code path: every action is a thin wrapper around a server action that already exists and was already correctly permission-checked.
+* **Migration 021**: `vault_actions` — tracks every proposal and its execution outcome, separate from but complementary to the platform's existing `audit_logs` (executions write to both).
+* **4 actions live** (`lib/ai/vault-actions.ts`): `trigger_code_scan`, `trigger_web3_audit`, `generate_ptaas_report`, `trigger_red_team_scan` — each gated to the roles that already pass the wrapped function's own auth check, not a new permission tier.
+* **`lib/ptaas/report-generation.ts`**: extracted from the existing PDF download route specifically so the button and VAULT's action call the identical function — proving the "no parallel path" rule in the design doc rather than just stating it.
+* **Streaming + structured actions, solved**: the model emits an optional trailing ` ```vault-action ` fenced JSON block; the chat route buffers and stops forwarding to the client the instant that fence starts (so raw JSON never flashes in the transcript), validates it server-side against the role allow-list, and only a validated action reaches the client as a distinct Action Preview card — never as chat text.
+* **Two real bugs found by running `tsc --noEmit`, not by review**: the client-side `VaultContextShape` type was missing fields I'd only added server-side, and a context-setter component was placed inside a nested render helper where its variable wasn't actually in scope. Both are exactly the kind of small, easy-to-miss error that a real compiler run catches and a code read doesn't — consistent with the project's broader verification findings.
+* **Hard exclusions, by omission not by permission check**: no reward action (`proposeReward`/`approveReward`/`markRewardPaid`) has a wrapper anywhere in this file, and none will — per the design doc, this invariant is enforced by what code doesn't exist, not a check that could be misconfigured.
 
 ---
 

@@ -9,6 +9,7 @@ export interface VaultContextShape {
   researcherId?: string;
   repoId?: string;
   engagementId?: string;
+  targetId?: string;
 }
 
 const VaultContextCtx = createContext<{
