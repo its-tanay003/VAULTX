@@ -12,6 +12,7 @@ import { ReportPanel }       from "@/components/ptaas/report-panel";
 import { formatDate }        from "@/lib/utils";
 import type { Metadata }     from "next";
 import type { SeverityLevel } from "@/lib/supabase/types";
+import { VaultContextSetter } from "@/components/vault/vault-context-setter";
 
 interface Props { params: { id: string } }
 
@@ -74,6 +75,7 @@ export default async function EngagementDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-in">
+      <VaultContextSetter page="ptaas_engagement_detail" engagementId={engagement.id} />
       <div className="flex items-start gap-3">
         <Link href="/dashboard/ptaas" className="text-vault-muted hover:text-vault-text transition-colors mt-1">
           <ChevronLeft className="w-4 h-4" />

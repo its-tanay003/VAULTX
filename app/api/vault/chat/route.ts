@@ -4,6 +4,8 @@ import {
   buildSystemPrompt, gatherContextData, detectDataQueryMetric, fetchDataForQuery,
   type VaultContext,
 } from "@/lib/ai/vault-agent";
+import { validateProposedAction } from "@/lib/ai/vault-actions";
+import type { UserRole } from "@/lib/supabase/types";
 
 export const runtime = "nodejs";
 
@@ -23,7 +25,8 @@ export async function POST(request: Request) {
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  const role: "researcher" | "admin" = profile?.role === "researcher" ? "researcher" : "admin";
+  const realRole: UserRole = profile?.role ?? "researcher";
+  const role: "researcher" | "admin" = realRole === "researcher" ? "researcher" : "admin";
 
   const body = await request.json().catch(() => null);
   const message: string | undefined = body?.message;
@@ -63,25 +66,81 @@ export async function POST(request: Request) {
     }
   }
 
-  const system = buildSystemPrompt(role, contextData);
+  const system = buildSystemPrompt(role, realRole, contextData);
 
   const encoder = new TextEncoder();
   let assembled = "";
 
   const stream = new ReadableStream({
     async start(controller) {
+      let fenceStarted = false;
       try {
         for await (const chunk of streamClaude({ system, user: message, history, maxTokens: 800, temperature: 0.4 })) {
           assembled += chunk;
-          controller.enqueue(encoder.encode(chunk));
+          // Stop forwarding to the client the moment the action fence
+          // begins — without this, the raw ```vault-action JSON block
+          // would flash visibly in the chat before end-of-stream
+          // stripping ever runs. A few characters right at the fence
+          // boundary might render for one chunk in the rare case the
+          // fence marker splits across two chunks; that's a much
+          // smaller cosmetic risk than showing the whole JSON block,
+          // and is an accepted tradeoff rather than an oversight.
+          if (!fenceStarted && assembled.includes("```vault-action")) {
+            fenceStarted = true;
+            const idx = assembled.indexOf("```vault-action");
+            const safeToShow = assembled.slice(0, idx);
+            const alreadyShown = assembled.length - chunk.length;
+            if (safeToShow.length > alreadyShown) {
+              controller.enqueue(encoder.encode(safeToShow.slice(alreadyShown)));
+            }
+            continue;
+          }
+          if (!fenceStarted) {
+            controller.enqueue(encoder.encode(chunk));
+          }
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         controller.enqueue(encoder.encode(`\n\n[VAULT is temporarily unavailable: ${msg}]`));
       } finally {
         if (assembled) {
-          await supabase.from("vault_messages").insert({ conversation_id: conversationId, role: "assistant", content: assembled });
+          // Strip any action block from what gets stored/shown as the
+          // assistant's text — it's rendered as a separate Action
+          // Preview card client-side, not as raw JSON in the transcript.
+          const actionMatch = assembled.match(/```vault-action\s*([\s\S]*?)```/);
+          const textOnly = assembled.replace(/```vault-action\s*[\s\S]*?```/, "").trim();
+
+          await supabase.from("vault_messages").insert({ conversation_id: conversationId, role: "assistant", content: textOnly || assembled });
           await supabase.from("vault_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+
+          if (actionMatch) {
+            try {
+              const parsed = JSON.parse(actionMatch[1]);
+              const validated = validateProposedAction(realRole, parsed.type, parsed.params ?? {});
+              if (validated) {
+                const { data: actionRow } = await supabase
+                  .from("vault_actions")
+                  .insert({
+                    conversation_id: conversationId, user_id: user.id,
+                    action_type: validated.type, params: validated.params, summary: validated.summary,
+                    status: "proposed",
+                  })
+                  .select("id").single();
+
+                if (actionRow) {
+                  controller.enqueue(encoder.encode(`\n\n__VAULT_ACTION__${JSON.stringify({
+                    id: actionRow.id, type: validated.type, params: validated.params, summary: validated.summary,
+                  })}`));
+                }
+              }
+              // If validation failed (bad role, missing param, unknown
+              // type), we silently drop it per the design doc §6.2 —
+              // the user already saw the text-only response above,
+              // nothing malformed reaches them.
+            } catch {
+              // Malformed JSON in the action block — same silent drop.
+            }
+          }
         }
         controller.close();
       }

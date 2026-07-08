@@ -11,6 +11,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import type { Metadata }     from "next";
 import type { CodeFinding }  from "@/lib/ai/code-review";
 import type { SmartContractFinding } from "@/lib/ai/smart-contract-audit";
+import { VaultContextSetter } from "@/components/vault/vault-context-setter";
 
 interface Props { params: { id: string } }
 
@@ -93,6 +94,7 @@ export default async function CodeScanDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 animate-in">
+      <VaultContextSetter page="code_quality_detail" repoId={repo.id} />
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-3">

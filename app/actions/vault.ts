@@ -30,3 +30,11 @@ export async function deleteVaultConversation(conversationId: string): Promise<v
   if (!user) throw new Error("Not authenticated");
   await supabase.from("vault_conversations").delete().eq("id", conversationId).eq("user_id", user.id);
 }
+
+/** Marks a proposed VAULT action as cancelled — used by the Action Preview card's Cancel button. */
+export async function cancelVaultAction(actionId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  await supabase.from("vault_actions").update({ status: "cancelled" }).eq("id", actionId).eq("user_id", user.id).eq("status", "proposed");
+}

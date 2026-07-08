@@ -7,6 +7,8 @@ export interface VaultContextShape {
   submissionId?: string;
   programId?: string;
   researcherId?: string;
+  repoId?: string;
+  engagementId?: string;
 }
 
 const VaultContextCtx = createContext<{

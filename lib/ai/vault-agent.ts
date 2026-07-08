@@ -16,12 +16,16 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { computeReport, type MetricKey } from "@/app/actions/reports";
+import { ACTION_REGISTRY, type ActionType } from "@/lib/ai/vault-actions";
+import type { UserRole } from "@/lib/supabase/types";
 
 export interface VaultContext {
   page?:          string;
   submissionId?:  string;
   programId?:     string;
   researcherId?:  string;
+  repoId?:        string;
+  engagementId?:  string;
 }
 
 const RESEARCHER_PERSONA = `You are VAULT, VAULTX's resident AI security intelligence agent, talking to a security researcher.
@@ -50,9 +54,28 @@ You can help with:
 
 CRITICAL: You never approve rewards, set final severity, or take any action — you only draft, suggest, and summarize. Every one of your outputs is advisory input to a human decision, stated explicitly here and enforced by this platform's core invariant.`;
 
-export function buildSystemPrompt(role: "researcher" | "admin", contextData: string): string {
-  const persona = role === "researcher" ? RESEARCHER_PERSONA : ADMIN_PERSONA;
-  return `${persona}
+export function buildSystemPrompt(persona: "researcher" | "admin", realRole: UserRole, contextData: string): string {
+  const personaPrompt = persona === "researcher" ? RESEARCHER_PERSONA : ADMIN_PERSONA;
+
+  const availableActions = (Object.values(ACTION_REGISTRY) as typeof ACTION_REGISTRY[ActionType][])
+    .filter((def) => def.allowedRoles.includes(realRole));
+
+  const actionInstructions = availableActions.length
+    ? `
+
+AGENT MODE — you can propose (never silently execute) these actions for this user, when their message clearly asks for something to be DONE, not just discussed:
+${availableActions.map((a) => `- ${a.type}: ${a.describe({})} Requires: ${Object.keys(a.paramSchema).join(", ")}.`).join("\n")}
+
+To propose an action, end your response with a fenced block exactly like this (only when the user's context data above gives you the real id needed — never invent an id):
+
+\`\`\`vault-action
+{"type": "trigger_code_scan", "params": {"repoId": "the-real-uuid-from-context"}}
+\`\`\`
+
+Only emit this block when you have a real, specific id from the context provided — if you don't have one, ask the user which item they mean instead of guessing or proposing an action with a placeholder id. Never emit more than one action block per response. If the user is just asking what an action would do, answer in prose only — do not emit an action block for a hypothetical question.`
+    : "";
+
+  return `${personaPrompt}${actionInstructions}
 
 Current context (may be empty if the user isn't viewing a specific item, or contains data answering a query they just asked):
 [DATA]
@@ -83,6 +106,20 @@ export async function gatherContextData(context: VaultContext): Promise<string> 
       .from("programs").select("name, type, description, scope_in, scope_out, min_reward, max_reward").eq("id", context.programId).single();
     if (program) {
       parts.push(`Program: "${program.name}" (${program.type}). In scope: ${JSON.stringify(program.scope_in)}. Out of scope: ${JSON.stringify(program.scope_out)}. Reward range: ${program.min_reward}-${program.max_reward}.`);
+    }
+  }
+
+  if (context.repoId) {
+    const { data: repo } = await supabase.from("code_repos").select("owner_name, repo_name").eq("id", context.repoId).single();
+    if (repo) {
+      parts.push(`Currently viewing repository: ${repo.owner_name}/${repo.repo_name} (id: ${context.repoId} — use this exact id for any scan action on this repo).`);
+    }
+  }
+
+  if (context.engagementId) {
+    const { data: engagement } = await supabase.from("pentest_engagements").select("name").eq("id", context.engagementId).single();
+    if (engagement) {
+      parts.push(`Currently viewing PTaaS engagement: "${engagement.name}" (id: ${context.engagementId} — use this exact id for any report action on this engagement).`);
     }
   }
 

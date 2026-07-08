@@ -7,10 +7,12 @@ import remarkGfm from "remark-gfm";
 import { Sparkles, X, Send, Loader2, Plus, History } from "lucide-react";
 import { useVaultContext } from "./vault-context";
 import { listVaultConversations, loadVaultConversation } from "@/app/actions/vault";
+import { VaultActionCard, type ProposedAction } from "./vault-action-card";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  action?: ProposedAction;
 }
 
 const RESEARCHER_QUICK_ACTIONS = [
@@ -59,16 +61,35 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
       if (!res.body) throw new Error("No response stream");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      let fullText = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
+        fullText += decoder.decode(value, { stream: true });
+
+        const markerIdx = fullText.indexOf("__VAULT_ACTION__");
+        const visibleText = markerIdx >= 0 ? fullText.slice(0, markerIdx) : fullText;
+
         setMessages((prev) => {
           const next = [...prev];
-          next[next.length - 1] = { role: "assistant", content: next[next.length - 1].content + chunk };
+          next[next.length - 1] = { ...next[next.length - 1], content: visibleText };
           return next;
         });
+      }
+
+      const markerIdx = fullText.indexOf("__VAULT_ACTION__");
+      if (markerIdx >= 0) {
+        try {
+          const action = JSON.parse(fullText.slice(markerIdx + "__VAULT_ACTION__".length)) as ProposedAction;
+          setMessages((prev) => {
+            const next = [...prev];
+            next[next.length - 1] = { ...next[next.length - 1], action };
+            return next;
+          });
+        } catch {
+          // Malformed marker payload — ignore, the text response already rendered fine.
+        }
       }
     } catch {
       setMessages((prev) => {
@@ -166,7 +187,7 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
                     </div>
                   )}
                   {messages.map((m, i) => (
-                    <div key={i} className={`text-sm ${m.role === "user" ? "text-right" : ""}`}>
+                    <div key={i} className={`text-sm ${m.role === "user" ? "text-right" : ""} space-y-2`}>
                       <div className={`inline-block max-w-[85%] rounded-xl px-3 py-2 text-left ${
                         m.role === "user" ? "bg-vault-teal text-black" : "bg-vault-elevated text-vault-text"
                       }`}>
@@ -176,6 +197,11 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
                           </div>
                         ) : m.content}
                       </div>
+                      {m.action && (
+                        <div>
+                          <VaultActionCard action={m.action} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
