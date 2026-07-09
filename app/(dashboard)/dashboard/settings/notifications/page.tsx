@@ -59,7 +59,7 @@ export default function NotificationsSettingsPage() {
         </FieldRow>
         <p className="text-[11px] text-vault-muted mt-3">
           In-app alerts (the bell icon in the dashboard) are always on and
-          don't require this toggle — this controls native OS notifications
+          don&apos;t require this toggle — this controls native OS notifications
           only.
         </p>
       </SectionCard>

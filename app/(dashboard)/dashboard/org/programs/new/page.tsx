@@ -275,7 +275,7 @@ export default function NewProgramPage() {
 
             {type === "vdp" ? (
               <InfoBox>
-                VDP programs don't offer monetary rewards. Researchers contribute for recognition,
+                VDP programs don&apos;t offer monetary rewards. Researchers contribute for recognition,
                 improved security, and leaderboard reputation.
               </InfoBox>
             ) : (

@@ -63,7 +63,7 @@ export default function DangerZonePage() {
           <div className="space-y-1">
             <p className="text-sm">Deactivate your account</p>
             <p className="text-xs text-vault-muted">
-              Your profile will be hidden and you won't receive notifications.
+              Your profile will be hidden and you won&apos;t receive notifications.
               You can reactivate by logging in within 30 days.
             </p>
           </div>

@@ -15,8 +15,8 @@ export default function NotFound() {
         <p className="font-mono text-xs text-vault-teal mb-3 tracking-widest">ERROR 404</p>
         <h1 className="text-2xl font-semibold mb-2">Asset not found</h1>
         <p className="text-sm text-vault-muted leading-relaxed mb-8">
-          This page is out of scope. The resource you're looking for doesn't exist
-          or you don't have access to it.
+          This page is out of scope. The resource you&apos;re looking for doesn&apos;t exist
+          or you don&apos;t have access to it.
         </p>
 
         <div className="flex items-center justify-center gap-3">

@@ -303,7 +303,7 @@ export default async function ProgramDetailPage({ params }: Props) {
                 <div>
                   <p className="text-sm font-medium text-yellow-400">Draft</p>
                   <p className="text-xs text-vault-muted mt-1">
-                    This program is not visible to researchers. Activate it when you're ready.
+                    This program is not visible to researchers. Activate it when you&apos;re ready.
                   </p>
                 </div>
               </div>

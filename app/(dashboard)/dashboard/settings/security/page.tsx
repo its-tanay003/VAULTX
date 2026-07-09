@@ -76,10 +76,9 @@ export default function SecuritySettingsPage() {
 
   return (
     <div className="space-y-5 animate-in">
+      {/* Password */}
       <SectionCard title="Change Password" description="Use a strong, unique password">
-        <form onSubmit={(e) => { e.preventDefault(); if (newPw.length >= 8 && newPw === confirmPw) handleChangePassword(); }} className="space-y-4">
-          {/* Hidden username input for password manager accessibility and form compliance */}
-          <input type="text" name="username" autoComplete="username" className="hidden" title="Username" readOnly value="current-user" />
+        <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium mb-1.5 text-vault-muted">New password</label>
             <div className="relative">
@@ -88,7 +87,6 @@ export default function SecuritySettingsPage() {
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value)}
                 placeholder="Min. 8 characters"
-                autoComplete="new-password"
                 className="vault-input w-full pr-9"
               />
               <button
@@ -118,16 +116,15 @@ export default function SecuritySettingsPage() {
               value={confirmPw}
               onChange={(e) => setConfirmPw(e.target.value)}
               placeholder="Repeat password"
-              autoComplete="new-password"
               className="vault-input w-full"
             />
             {confirmPw && newPw !== confirmPw && (
-              <p className="text-xs text-red-400 mt-1">Passwords don't match</p>
+              <p className="text-xs text-red-400 mt-1">Passwords don&apos;t match</p>
             )}
           </div>
 
           <button
-            type="submit"
+            onClick={handleChangePassword}
             disabled={pwPending || newPw.length < 8 || newPw !== confirmPw}
             className="btn-teal flex items-center gap-2 disabled:opacity-40"
           >
@@ -135,7 +132,7 @@ export default function SecuritySettingsPage() {
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Updating…</>
               : <><Lock className="w-4 h-4" /> Update password</>}
           </button>
-        </form>
+        </div>
       </SectionCard>
 
       {/* 2FA */}

@@ -76,7 +76,7 @@ export function AIDuplicatePanel({ contestId }: Props) {
                 </p>
               </div>
               <p className="text-[10px] text-vault-muted italic">
-                Use the "Duplicate of" selector in each finding card to apply these suggestions — AI groups are suggestions only.
+                Use the &quot;Duplicate of&quot; selector in each finding card to apply these suggestions — AI groups are suggestions only.
               </p>
             </div>
           ))}

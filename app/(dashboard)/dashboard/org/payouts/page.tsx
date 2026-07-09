@@ -67,7 +67,7 @@ export default async function PayoutAuditLogPage() {
         <h1 className="text-xl font-semibold">Payout Audit Log</h1>
         <p className="text-sm text-vault-muted mt-0.5">
           Every reward action — proposal, approval, decline, and payout — with who did it and when.
-          Sourced from the platform's immutable, append-only audit log.
+          Sourced from the platform&apos;s immutable, append-only audit log.
         </p>
       </div>
 

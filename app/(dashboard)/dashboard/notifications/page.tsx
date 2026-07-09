@@ -72,7 +72,7 @@ export default async function NotificationsPage() {
           <Bell className="w-8 h-8 text-vault-muted mb-3 opacity-50" />
           <p className="font-medium mb-1">No notifications</p>
           <p className="text-sm text-vault-muted">
-            We'll notify you when something needs your attention
+            We&apos;ll notify you when something needs your attention
           </p>
         </div>
       ) : (

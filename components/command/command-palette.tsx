@@ -193,7 +193,7 @@ export function CommandPalette({ open, onClose, role }: Props) {
 
                 {!searching && allCommands.length === 0 && (
                   <div className="px-4 py-6 text-center text-xs text-vault-muted">
-                    No results for "{query}"
+                    No results for &quot;{query}&quot;
                   </div>
                 )}
 

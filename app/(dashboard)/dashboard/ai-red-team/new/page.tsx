@@ -70,7 +70,7 @@ A Node.js/Express REST API handling user authentication via JWT, with a Postgres
         <div className="bg-vault-elevated border border-vault-border rounded-lg p-3">
           <p className="text-[11px] text-vault-muted leading-relaxed">
             The first scan runs immediately after creation. After that, this target is included in the
-            daily scheduled scan (via GitHub Actions cron) as long as it's marked active — true continuous
+            daily scheduled scan (via GitHub Actions cron) as long as it&apos;s marked active — true continuous
             scanning, not a one-time check.
           </p>
         </div>

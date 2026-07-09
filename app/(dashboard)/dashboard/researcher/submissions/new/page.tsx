@@ -320,7 +320,7 @@ export default function NewSubmissionPage() {
           <div className="space-y-5">
             <InfoBox icon={<AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />}>
               Impact analysis is the most overlooked part of a report. Triagers need to understand
-              real-world consequences — not just "this is a security issue."
+              real-world consequences — not just &quot;this is a security issue.&quot;
             </InfoBox>
 
             <div>
@@ -381,8 +381,8 @@ Attack vector: Network / Attack complexity: Low / Privileges: None`}
               </p>
               <p>1. AI checks for exact and semantic duplicates within this program</p>
               <p>2. AI suggests a severity level with confidence score</p>
-              <p>3. A triager reviews within the program's SLA</p>
-              <p>4. You get notified by email when there's an update</p>
+              <p>3. A triager reviews within the program&apos;s SLA</p>
+              <p>4. You get notified by email when there&apos;s an update</p>
             </div>
           </div>
         )}

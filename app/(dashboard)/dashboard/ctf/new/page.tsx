@@ -68,8 +68,8 @@ export default async function NewCompetitionPage() {
 
         <div className="bg-vault-elevated border border-vault-border rounded-lg p-3">
           <p className="text-[11px] text-vault-muted leading-relaxed">
-            After creating the competition, you'll add challenges from the management page.
-            The competition stays in "Draft" status until you manually activate it.
+            After creating the competition, you&apos;ll add challenges from the management page.
+            The competition stays in &quot;Draft&quot; status until you manually activate it.
           </p>
         </div>
 

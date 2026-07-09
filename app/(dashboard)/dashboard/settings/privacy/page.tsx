@@ -123,7 +123,7 @@ export default function PrivacySettingsPage() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm">Request data export</p>
-            <p className="text-xs text-vault-muted">You'll receive a ZIP via email within 24 hours.</p>
+            <p className="text-xs text-vault-muted">You&apos;ll receive a ZIP via email within 24 hours.</p>
           </div>
           <button
             onClick={handleExport}
