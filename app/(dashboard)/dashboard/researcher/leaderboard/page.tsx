@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect }      from "next/navigation";
 import Link               from "next/link";
+import Image              from "next/image";
 import { Trophy, Medal, Award, Bug, DollarSign, TrendingUp } from "lucide-react";
 import { formatCurrency, getInitials } from "@/lib/utils";
 import type { Metadata } from "next";
@@ -18,23 +19,44 @@ export default async function LeaderboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: leaders } = await supabase
-    .from("leaderboard")
-    .select("*")
+  // Load leaderboard statistics
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, username, full_name, avatar_url, reputation")
     .order("reputation", { ascending: false })
-    .limit(50);
+    .limit(100);
 
-  const rows = leaders ?? [];
+  const { data: solvedStats } = await supabase
+    .from("submissions")
+    .select("researcher_id, status")
+    .eq("status", "accepted");
+
+  const { data: payoutStats } = await supabase
+    .from("rewards")
+    .select("researcher_id, amount, status")
+    .eq("status", "paid");
+
+  // Aggregate stats
+  const rows = (profiles ?? []).map((p) => {
+    const accepted = (solvedStats ?? []).filter((s) => s.researcher_id === p.id).length;
+    const earned   = (payoutStats ?? []).filter((pay) => pay.researcher_id === p.id).reduce((sum, r) => sum + r.amount, 0);
+    return {
+      ...p,
+      accepted_count: accepted,
+      total_earned:   earned,
+    };
+  });
+
   const myRank = rows.findIndex((r) => r.id === user.id);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5 animate-in">
+    <div className="max-w-3xl mx-auto space-y-6 animate-in">
       <div>
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-vault-teal" /> Leaderboard
+        <h1 className="text-xl font-bold flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-vault-teal" /> Global Leaderboard
         </h1>
         <p className="text-sm text-vault-muted mt-0.5">
-          Top researchers ranked by reputation across all VAULTX programs
+          Top security researchers ranked by reputation points
         </p>
       </div>
 
@@ -55,8 +77,8 @@ export default async function LeaderboardPage() {
         </div>
       )}
 
-      {/* Top 3 podium */}
-      {rows.length >= 3 && (
+      {/* Top 3 Podium */}
+      {rows.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           {[1, 0, 2].map((idx) => {
             const r = rows[idx];
@@ -68,12 +90,14 @@ export default async function LeaderboardPage() {
                 className={`vault-card p-4 text-center ${idx === 0 ? "scale-105 ring-2" : ""} ${style.ring}`}
                 style={idx === 0 ? { marginTop: "-8px" } : undefined}
               >
-                <div className={`w-12 h-12 rounded-full ${style.bg} border flex items-center justify-center mx-auto mb-2 relative`}>
-                  <span className="text-sm font-semibold text-vault-text">
-                    {r.avatar_url ? (
-                      <img src={r.avatar_url} className="w-full h-full rounded-full object-cover" alt="" />
-                    ) : getInitials(r.full_name)}
-                  </span>
+                <div className={`w-12 h-12 rounded-full ${style.bg} border flex items-center justify-center mx-auto mb-2 relative overflow-hidden`}>
+                  {r.avatar_url ? (
+                    <Image src={r.avatar_url} width={48} height={48} className="w-full h-full rounded-full object-cover" alt="" />
+                  ) : (
+                    <span className="text-sm font-semibold text-vault-text">
+                      {getInitials(r.full_name)}
+                    </span>
+                  )}
                   <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-vault-bg border border-vault-border flex items-center justify-center">
                     {style.icon}
                   </div>
@@ -109,10 +133,12 @@ export default async function LeaderboardPage() {
                 {i + 1}
               </span>
 
-              <div className="w-8 h-8 rounded-full bg-vault-teal/10 border border-vault-teal/20 flex items-center justify-center text-xs font-medium text-vault-teal shrink-0 overflow-hidden">
-                {r.avatar_url
-                  ? <img src={r.avatar_url} className="w-full h-full object-cover" alt="" />
-                  : getInitials(r.full_name)}
+              <div className="w-8 h-8 rounded-full bg-vault-teal/10 border border-vault-teal/20 flex items-center justify-center text-xs font-medium text-vault-teal shrink-0 overflow-hidden relative">
+                {r.avatar_url ? (
+                  <Image src={r.avatar_url} width={32} height={32} className="w-full h-full object-cover" alt="" />
+                ) : (
+                  getInitials(r.full_name)
+                )}
               </div>
 
               <div className="flex-1 min-w-0">

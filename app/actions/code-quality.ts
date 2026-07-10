@@ -102,9 +102,28 @@ export async function disconnectRepo(repoId: string) {
 export async function runScan(repoId: string): Promise<void> {
   const supabase = createClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // Check rate limit (e.g., max 10 scans per user per hour, fails-closed)
+  const { checkApiRateLimit } = await import("@/lib/api/rate-limit");
+  const rateLimitKey = `scan:${user.id}`;
+  const rateCheck = await checkApiRateLimit(rateLimitKey, 10, true);
+  if (!rateCheck.ok) {
+    throw new Error("Rate limit exceeded. Maximum 10 scans per hour.");
+  }
+
   const { data: repo } = await supabase
     .from("code_repos").select("*").eq("id", repoId).single();
   if (!repo) throw new Error("Repo not found");
+
+  // Cooldown check: can't rescan the same repo within 5 minutes
+  if (repo.last_scanned_at) {
+    const elapsed = Date.now() - new Date(repo.last_scanned_at).getTime();
+    if (elapsed < 5 * 60 * 1000) {
+      throw new Error("Cooldown active. Please wait at least 5 minutes between scans.");
+    }
+  }
 
   const { data: scan } = await supabase
     .from("code_scans")
@@ -154,9 +173,28 @@ export async function runScan(repoId: string): Promise<void> {
 export async function runWeb3Audit(repoId: string): Promise<void> {
   const supabase = createClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // Check rate limit (e.g., max 10 scans per user per hour, fails-closed)
+  const { checkApiRateLimit } = await import("@/lib/api/rate-limit");
+  const rateLimitKey = `scan:${user.id}`;
+  const rateCheck = await checkApiRateLimit(rateLimitKey, 10, true);
+  if (!rateCheck.ok) {
+    throw new Error("Rate limit exceeded. Maximum 10 scans per hour.");
+  }
+
   const { data: repo } = await supabase
     .from("code_repos").select("*").eq("id", repoId).single();
   if (!repo) throw new Error("Repo not found");
+
+  // Cooldown check: can't rescan the same repo within 5 minutes
+  if (repo.last_scanned_at) {
+    const elapsed = Date.now() - new Date(repo.last_scanned_at).getTime();
+    if (elapsed < 5 * 60 * 1000) {
+      throw new Error("Cooldown active. Please wait at least 5 minutes between scans.");
+    }
+  }
 
   // Create scan record immediately so the UI can show "Running…"
   const { data: scan } = await supabase

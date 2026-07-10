@@ -20,6 +20,10 @@ export const runtime = "nodejs";
  * completes.
  */
 export async function POST(request: Request) {
+  const { validateCsrf } = await import("@/lib/api/csrf");
+  const csrfError = validateCsrf(request);
+  if (csrfError) return csrfError;
+
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Response("Unauthorized", { status: 401 });

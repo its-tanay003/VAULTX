@@ -149,22 +149,36 @@ export default async function SubmissionDetailPage({ params }: Props) {
           {sub.attachments && sub.attachments.length > 0 && (
             <ReportSection title={`Attachments (${sub.attachments.length})`}>
               <div className="space-y-2">
-                {sub.attachments.map((url: string, i: number) => {
-                  const name = url.split("/").pop() ?? `attachment-${i + 1}`;
-                  return (
+                {await (async () => {
+                  const { getAttachmentDownloadUrl } = await import("@/app/actions/submissions");
+                  const links = await Promise.all(
+                    sub.attachments.map(async (path: string) => {
+                      try {
+                        // If it's a legacy public URL, return it directly, otherwise fetch signed url
+                        if (path.startsWith("http://") || path.startsWith("https://")) {
+                          return { name: path.split("/").pop() ?? "attachment", url: path };
+                        }
+                        const url = await getAttachmentDownloadUrl(path);
+                        return { name: path.split("/").pop() ?? "attachment", url };
+                      } catch (err) {
+                        return { name: path.split("/").pop() ?? "attachment", url: "#", error: true };
+                      }
+                    })
+                  );
+                  return links.map((item, i) => (
                     <a
                       key={i}
-                      href={url}
-                      target="_blank"
+                      href={item.url}
+                      target={item.error ? undefined : "_blank"}
                       rel="noopener noreferrer"
                       className="flex items-center gap-2.5 p-2.5 bg-vault-elevated border border-vault-border rounded-lg hover:border-vault-teal/40 transition-colors text-sm"
                     >
                       <Paperclip className="w-3.5 h-3.5 text-vault-teal shrink-0" />
-                      <span className="flex-1 truncate text-vault-subtle">{name}</span>
-                      <span className="text-xs text-vault-teal">View →</span>
+                      <span className="flex-1 truncate text-vault-subtle">{item.name}</span>
+                      <span className="text-xs text-vault-teal">{item.error ? "Unavailable" : "View →"}</span>
                     </a>
-                  );
-                })}
+                  ));
+                })()}
               </div>
             </ReportSection>
           )}

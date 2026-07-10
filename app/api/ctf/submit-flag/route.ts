@@ -28,6 +28,10 @@ import { createHash, timingSafeEqual } from "crypto";
  */
 export async function POST(request: Request) {
   try {
+    const { validateCsrf } = await import("@/lib/api/csrf");
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
+
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

@@ -66,9 +66,17 @@ export async function triggerScan(targetId: string): Promise<{ success: boolean;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
+    // Rate Limit (e.g., max 10 red team scans per hour per user, fails-closed)
+    const { checkApiRateLimit } = await import("@/lib/api/rate-limit");
+    const rateLimitKey = `redteam:${user.id}`;
+    const rateCheck = await checkApiRateLimit(rateLimitKey, 10, true);
+    if (!rateCheck.ok) {
+      throw new Error("Rate limit exceeded. Maximum 10 scans per hour.");
+    }
+
     const { data: target } = await supabase
       .from("red_team_targets")
-      .select("org_id, organizations(owner_id)")
+      .select("org_id, last_scanned_at, organizations(owner_id)")
       .eq("id", targetId)
       .single();
 
@@ -77,7 +85,22 @@ export async function triggerScan(targetId: string): Promise<{ success: boolean;
       throw new Error("Access denied — you don't own this target");
     }
 
+    // Cooldown check (5 minutes)
+    if (target.last_scanned_at) {
+      const elapsed = Date.now() - new Date(target.last_scanned_at).getTime();
+      if (elapsed < 5 * 60 * 1000) {
+        throw new Error("Cooldown active. Please wait at least 5 minutes between scans.");
+      }
+    }
+
     await runRedTeamScan(targetId);
+
+    // Update target last_scanned_at timestamp
+    await supabase
+      .from("red_team_targets")
+      .update({ last_scanned_at: new Date().toISOString() })
+      .eq("id", targetId);
+
     revalidatePath(`/dashboard/ai-red-team/${targetId}`);
     revalidatePath("/dashboard/ai-red-team");
     return { success: true };

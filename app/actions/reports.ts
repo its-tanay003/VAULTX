@@ -150,10 +150,10 @@ export async function getEmbeddedReport(token: string) {
 
   for (const metric of config.metrics) {
     switch (metric) {
-      case "bugs_submitted":        results[metric] = await metricBugsSubmitted(filters); break;
-      case "bugs_resolved":         results[metric] = await metricBugsResolved(filters); break;
-      case "severity_distribution": results[metric] = await metricSeverityDistribution(filters); break;
-      case "payout_totals":         results[metric] = await metricPayoutTotals(filters); break;
+      case "bugs_submitted":        results[metric] = await metricBugsSubmitted(filters, supabase); break;
+      case "bugs_resolved":         results[metric] = await metricBugsResolved(filters, supabase); break;
+      case "severity_distribution": results[metric] = await metricSeverityDistribution(filters, supabase); break;
+      case "payout_totals":         results[metric] = await metricPayoutTotals(filters, supabase); break;
       default: break; // embed views deliberately omit researcher-identifying metrics (leaderboard, activity) — see README note
     }
   }

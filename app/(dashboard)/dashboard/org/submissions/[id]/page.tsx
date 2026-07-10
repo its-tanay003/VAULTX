@@ -189,15 +189,31 @@ export default async function OrgSubmissionDetailPage({ params }: Props) {
           {sub.attachments?.length > 0 && (
             <Section title={`Attachments (${sub.attachments.length})`}>
               <div className="space-y-2">
-                {sub.attachments.map((url: string, i: number) => (
-                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 p-2.5 bg-vault-elevated border border-vault-border rounded-lg hover:border-vault-teal/40 transition-colors text-sm"
-                  >
-                    <Paperclip className="w-3.5 h-3.5 text-vault-teal" />
-                    <span className="flex-1 truncate text-vault-subtle">{url.split("/").pop()}</span>
-                    <span className="text-xs text-vault-teal">Open →</span>
-                  </a>
-                ))}
+                {await (async () => {
+                  const { getAttachmentDownloadUrl } = await import("@/app/actions/submissions");
+                  const links = await Promise.all(
+                    sub.attachments.map(async (path: string) => {
+                      try {
+                        if (path.startsWith("http://") || path.startsWith("https://")) {
+                          return { name: path.split("/").pop() ?? "attachment", url: path };
+                        }
+                        const url = await getAttachmentDownloadUrl(path);
+                        return { name: path.split("/").pop() ?? "attachment", url };
+                      } catch (err) {
+                        return { name: path.split("/").pop() ?? "attachment", url: "#", error: true };
+                      }
+                    })
+                  );
+                  return links.map((item, i) => (
+                    <a key={i} href={item.url} target={item.error ? undefined : "_blank"} rel="noopener noreferrer"
+                      className="flex items-center gap-2.5 p-2.5 bg-vault-elevated border border-vault-border rounded-lg hover:border-vault-teal/40 transition-colors text-sm"
+                    >
+                      <Paperclip className="w-3.5 h-3.5 text-vault-teal" />
+                      <span className="flex-1 truncate text-vault-subtle">{item.name}</span>
+                      <span className="text-xs text-vault-teal">{item.error ? "Unavailable" : "Open →"}</span>
+                    </a>
+                  ));
+                })()}
               </div>
             </Section>
           )}

@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { getEmbeddedReport } from "@/app/actions/reports";
-import { EmbedChart } from "@/components/reports/embed-chart";
+import dynamic from "next/dynamic";
+
+const EmbedChart = dynamic(
+  () => import("@/components/reports/embed-chart").then((mod) => mod.EmbedChart),
+  { ssr: false }
+);
 
 /**
  * GET /r/[token]

@@ -13,6 +13,10 @@ import { notifySubmissionReceived } from "@/lib/notifications/service";
  */
 export async function POST(request: Request) {
   try {
+    const { validateCsrf } = await import("@/lib/api/csrf");
+    const csrfError = validateCsrf(request);
+    if (csrfError) return csrfError;
+
     const body = await request.json().catch(() => ({}));
     const { submission_id: submissionId } = body as { submission_id?: string };
 
@@ -28,8 +32,16 @@ export async function POST(request: Request) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+      // Rate limit (e.g., max 15 validations per user per hour, fails-closed)
+      const { checkApiRateLimit } = await import("@/lib/api/rate-limit");
+      const rateLimitKey = `validate:${user.id}`;
+      const rateCheck = await checkApiRateLimit(rateLimitKey, 15, true);
+      if (!rateCheck.ok) {
+        return NextResponse.json({ error: "Rate limit exceeded. Maximum 15 validation attempts per hour." }, { status: 429 });
+      }
+
       const { data: sub } = await supabase
-        .from("submissions").select("researcher_id").eq("id", submissionId).single();
+        .from("submissions").select("researcher_id, last_validated_at").eq("id", submissionId).single();
       const { data: profile } = await supabase
         .from("profiles").select("role").eq("id", user.id).single();
 
@@ -38,6 +50,20 @@ export async function POST(request: Request) {
       if (!isOwner && !isPriv) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
+
+      // Cooldown check (2 minutes)
+      if (sub?.last_validated_at) {
+        const elapsed = Date.now() - new Date(sub.last_validated_at).getTime();
+        if (elapsed < 2 * 60 * 1000) {
+          return NextResponse.json({ error: "Cooldown active. Please wait at least 2 minutes between validations." }, { status: 429 });
+        }
+      }
+
+      // Update last_validated_at
+      await supabase
+        .from("submissions")
+        .update({ last_validated_at: new Date().toISOString() })
+        .eq("id", submissionId);
     }
 
     // Run the 3-stage validation pipeline

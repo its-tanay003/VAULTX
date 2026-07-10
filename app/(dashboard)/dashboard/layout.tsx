@@ -5,8 +5,13 @@ import { Header }  from "@/components/layout/header";
 import { PageTransition }          from "@/components/providers/page-transition";
 import { CommandPaletteProvider }  from "@/components/providers/command-palette-provider";
 import { SkipToContent }           from "@/components/ui/skip-to-content";
-import { VaultContextProvider }    from "@/components/vault/vault-context";
-import { VaultWidget }             from "@/components/vault/vault-widget";
+import { VaultContextProvider } from "@/components/vault/vault-context";
+import dynamic from "next/dynamic";
+
+const VaultWidget = dynamic(
+  () => import("@/components/vault/vault-widget").then((mod) => mod.VaultWidget),
+  { ssr: false }
+);
 
 /**
  * UPDATED Week 7 (final):

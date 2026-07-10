@@ -111,7 +111,7 @@ export function emailMeta(label: string, value: string): string {
   </tr>`;
 }
 
-function escHtml(str: string): string {
+export function escHtml(str: string): string {
   return str
     .replace(/&/g,  "&amp;")
     .replace(/</g,  "&lt;")

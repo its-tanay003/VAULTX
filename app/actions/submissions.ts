@@ -159,11 +159,7 @@ export async function uploadAttachment(
 
   if (error) throw new Error(error.message);
 
-  const { data: { publicUrl } } = supabase.storage
-    .from("attachments")
-    .getPublicUrl(path);
-
-  // Append URL to submission
+  // Append raw path to submission attachments array (private bucket safety)
   const { data: sub } = await supabase
     .from("submissions")
     .select("attachments")
@@ -172,8 +168,24 @@ export async function uploadAttachment(
 
   await supabase
     .from("submissions")
-    .update({ attachments: [...(sub?.attachments ?? []), publicUrl] })
+    .update({ attachments: [...(sub?.attachments ?? []), path] })
     .eq("id", submissionId);
 
-  return publicUrl;
+  return path;
+}
+
+/** Generates a time-limited signed download URL fresh at fetch time for private attachment paths */
+export async function getAttachmentDownloadUrl(path: string): Promise<string> {
+  const supabase = createClient();
+  
+  // RLS policy on submissions/profiles will govern if they have access to the file/folder
+  const { data, error } = await supabase.storage
+    .from("attachments")
+    .createSignedUrl(path, 900); // 15 minutes validity
+    
+  if (error || !data?.signedUrl) {
+    throw new Error("Unable to generate download link for attachment");
+  }
+  
+  return data.signedUrl;
 }

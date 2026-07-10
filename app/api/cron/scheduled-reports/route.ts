@@ -63,22 +63,22 @@ export async function GET(request: Request) {
       for (const metric of config.metrics as MetricKey[]) {
         switch (metric) {
           case "bugs_submitted": {
-            const data = await metricBugsSubmitted(filters);
+            const data = await metricBugsSubmitted(filters, supabase);
             lines.push(`Bugs Submitted: ${data.reduce((s, d) => s + d.value, 0)} total`);
             break;
           }
           case "bugs_resolved": {
-            const data = await metricBugsResolved(filters);
+            const data = await metricBugsResolved(filters, supabase);
             lines.push(`Bugs Resolved: ${data.reduce((s, d) => s + d.value, 0)} total`);
             break;
           }
           case "severity_distribution": {
-            const data = await metricSeverityDistribution(filters);
+            const data = await metricSeverityDistribution(filters, supabase);
             lines.push(`Severity: ${data.map((d) => `${d.label}=${d.value}`).join(", ")}`);
             break;
           }
           case "payout_totals": {
-            const data = await metricPayoutTotals(filters);
+            const data = await metricPayoutTotals(filters, supabase);
             lines.push(`Payouts: ${data.reduce((s, d) => s + d.value, 0)} total`);
             break;
           }

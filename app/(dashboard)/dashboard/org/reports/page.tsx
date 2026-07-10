@@ -1,8 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect }     from "next/navigation";
-import { ReportBuilder } from "@/components/reports/report-builder";
-import { listReportTemplates } from "@/app/actions/reports";
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
+import { listReportTemplates } from "@/app/actions/reports";
+
+const ReportBuilder = dynamic(
+  () => import("@/components/reports/report-builder").then((mod) => mod.ReportBuilder),
+  { ssr: false }
+);
 
 export const metadata: Metadata = { title: "Reports" };
 

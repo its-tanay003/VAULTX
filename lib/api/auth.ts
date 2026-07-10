@@ -32,9 +32,7 @@ export interface AuthedApiKey {
   scopes: ApiScope[];
 }
 
-function sha256(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
+
 
 /**
  * Authenticates a request by its Bearer token. Returns null (never
@@ -47,33 +45,46 @@ export async function authenticateApiKey(request: Request): Promise<AuthedApiKey
   const rawKey = header.slice("Bearer ".length).trim();
   if (!rawKey.startsWith("vx_")) return null;
 
-  const keyHash = sha256(rawKey);
+  const prefix = rawKey.slice(0, 11); // "vx_" + 8 hex chars
   const supabase = createAdminClient();
 
-  // JSONB array containment match: find the user_settings row whose
-  // api_keys array contains an entry with this hash. PostgREST's `cs`
-  // (contains) operator on a jsonb column checks array/object
-  // containment, so this finds the row without needing a dedicated
-  // indexed key table.
-  const { data: rows, error } = await supabase
-    .from("user_settings")
-    .select("id, api_keys")
-    .filter("api_keys", "cs", JSON.stringify([{ hash: keyHash }]));
+  // Look up candidate keys by prefix (highly indexed)
+  const { data: keys, error } = await supabase
+    .from("api_keys")
+    .select("id, user_id, key_salt, key_hash, scopes, expires_at")
+    .eq("key_prefix", prefix);
 
-  if (error || !rows?.length) return null;
+  if (error || !keys || keys.length === 0) return null;
 
-  const row = rows[0];
-  const keys = (row.api_keys as { id: string; hash: string; scopes: string[] }[]) ?? [];
-  const match = keys.find((k) => k.hash === keyHash);
+  // First hash pass: SHA-256(rawKey)
+  const firstHash = crypto.createHash("sha256").update(rawKey).digest("hex");
+
+  let match: typeof keys[0] | null = null;
+  for (const candidate of keys) {
+    // Second hash pass: SHA-256(firstHash + salt)
+    const computedHash = crypto.createHash("sha256").update(firstHash + candidate.key_salt).digest("hex");
+    if (computedHash === candidate.key_hash) {
+      match = candidate;
+      break;
+    }
+  }
+
   if (!match) return null;
 
-  // Fire-and-forget last_used_at bump — never block the request on it.
-  const updated = keys.map((k) => (k.id === match.id ? { ...k, last_used_at: new Date().toISOString() } : k));
-  supabase.from("user_settings").update({ api_keys: updated }).eq("id", row.id)
+  // Check expiration date
+  if (match.expires_at && new Date(match.expires_at).getTime() < Date.now()) {
+    return null;
+  }
+
+  // Fire-and-forget last_used_at bump
+  supabase
+    .from("api_keys")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("id", match.id)
     .then(undefined, (err: unknown) => console.error("[API Auth] last_used_at update failed:", err));
 
   return {
-    userId: row.id,
+    userId: match.user_id,
     keyId:  match.id,
     scopes: (match.scopes ?? []) as ApiScope[],
   };

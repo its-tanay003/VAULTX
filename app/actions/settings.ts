@@ -7,16 +7,6 @@ import crypto              from "crypto";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface ApiKey {
-  id:           string;
-  name:         string;
-  prefix:       string;   // first 8 chars shown to user
-  hash:         string;   // sha-256 of full key (stored)
-  scopes:       string[];
-  created_at:   string;
-  last_used_at: string | null;
-}
-
 export interface ActiveSession {
   id:         string;
   device:     string;
@@ -84,6 +74,22 @@ function sha256(value: string) {
 export async function getUserSettings(): Promise<UserSettingsData> {
   const { supabase, user } = await getAuthedUser();
 
+  // Fetch keys from public.api_keys table
+  const { data: keysData } = await supabase
+    .from("api_keys")
+    .select("id, name, key_prefix, scopes, created_at, last_used_at, expires_at")
+    .eq("user_id", user.id);
+
+  const apiKeysMapped: ApiKey[] = (keysData ?? []).map((k) => ({
+    id:           k.id,
+    name:         k.name,
+    prefix:       k.key_prefix,
+    scopes:       k.scopes,
+    created_at:   k.created_at,
+    last_used_at: k.last_used_at,
+    expires_at:   k.expires_at,
+  }));
+
   // Upsert to ensure row exists
   const { data, error } = await supabase
     .from("user_settings")
@@ -99,10 +105,10 @@ export async function getUserSettings(): Promise<UserSettingsData> {
       .eq("id", user.id)
       .single();
     if (fetchErr) throw new Error(fetchErr.message);
-    return existing as UserSettingsData;
+    return { ...existing, api_keys: apiKeysMapped } as UserSettingsData;
   }
 
-  return data as UserSettingsData;
+  return { ...data, api_keys: apiKeysMapped } as UserSettingsData;
 }
 
 export async function updateUserSettings(updates: Partial<UserSettingsData>) {
@@ -183,37 +189,50 @@ export async function updateOrgProfile(formData: FormData) {
 
 // ─── API Keys ─────────────────────────────────────────────────────────────────
 
+export interface ApiKey {
+  id:           string;
+  name:         string;
+  prefix:       string;
+  scopes:       string[];
+  created_at:   string;
+  last_used_at: string | null;
+  expires_at?:  string | null;
+}
+
 export async function generateApiKey(name: string, scopes: string[]): Promise<string> {
   const { supabase, user } = await getAuthedUser();
 
   const rawKey  = `vx_${crypto.randomBytes(32).toString("hex")}`;
   const prefix  = rawKey.slice(0, 11); // "vx_" + 8 hex chars
-  const keyHash = sha256(rawKey);
+  
+  // Double-hash: SHA-256(SHA-256(plaintext_key) + salt)
+  const salt    = crypto.randomBytes(32).toString("hex");
+  const firstHash = crypto.createHash("sha256").update(rawKey).digest("hex");
+  const keyHash = crypto.createHash("sha256").update(firstHash + salt).digest("hex");
   const keyId   = crypto.randomUUID();
 
-  const { data: settings } = await supabase
-    .from("user_settings")
-    .select("api_keys")
-    .eq("id", user.id)
-    .single();
+  // Check limit (10 keys)
+  const { count } = await supabase
+    .from("api_keys")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id);
 
-  const existing: ApiKey[] = (settings?.api_keys as ApiKey[]) ?? [];
-
-  if (existing.length >= 10) throw new Error("Maximum 10 API keys allowed.");
-
-  const newKey: ApiKey = {
-    id:           keyId,
-    name,
-    prefix,
-    hash:         keyHash,
-    scopes,
-    created_at:   new Date().toISOString(),
-    last_used_at: null,
-  };
+  if (count !== null && count >= 10) {
+    throw new Error("Maximum 10 API keys allowed.");
+  }
 
   const { error } = await supabase
-    .from("user_settings")
-    .upsert({ id: user.id, api_keys: [...existing, newKey] }, { onConflict: "id" });
+    .from("api_keys")
+    .insert({
+      id: keyId,
+      user_id: user.id,
+      name,
+      key_prefix: prefix,
+      key_salt: salt,
+      key_hash: keyHash,
+      scopes,
+      expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year default
+    });
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/settings/api-keys");
@@ -224,18 +243,11 @@ export async function generateApiKey(name: string, scopes: string[]): Promise<st
 export async function revokeApiKey(keyId: string) {
   const { supabase, user } = await getAuthedUser();
 
-  const { data: settings } = await supabase
-    .from("user_settings")
-    .select("api_keys")
-    .eq("id", user.id)
-    .single();
-
-  const filtered = ((settings?.api_keys as ApiKey[]) ?? []).filter((k) => k.id !== keyId);
-
   const { error } = await supabase
-    .from("user_settings")
-    .update({ api_keys: filtered })
-    .eq("id", user.id);
+    .from("api_keys")
+    .delete()
+    .eq("id", keyId)
+    .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/settings/api-keys");

@@ -16,10 +16,21 @@
 const WINDOW_SECONDS = 3600; // 1 hour
 const DEFAULT_LIMIT  = 100;  // requests per key per hour — generous for CI/scripts, still bounded
 
-export async function checkApiRateLimit(keyId: string, limit = DEFAULT_LIMIT): Promise<{ ok: boolean; remaining: number }> {
+export async function checkApiRateLimit(
+  keyId: string,
+  limit = DEFAULT_LIMIT,
+  isHighCost = false
+): Promise<{ ok: boolean; remaining: number }> {
   const url   = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return { ok: true, remaining: limit }; // not configured — skip
+  
+  if (!url || !token) {
+    if (isHighCost) {
+      console.warn(`[API Rate Limit WARNING] Upstash Redis URL or Token is missing. Blocking high-cost action for keyId: ${keyId}`);
+      return { ok: false, remaining: 0 };
+    }
+    return { ok: true, remaining: limit }; // cheap actions: skip
+  }
 
   const key = `rate:api:${keyId}`;
 
@@ -33,8 +44,15 @@ export async function checkApiRateLimit(keyId: string, limit = DEFAULT_LIMIT): P
 
     return { ok: count <= limit, remaining: Math.max(0, limit - count) };
   } catch (err) {
-    // Fail open — a Redis outage shouldn't take down the public API.
-    console.error("[API Rate Limit] Check failed, allowing request:", err);
+    // Alerting: Log warning when connection fails or Upstash is down
+    console.error(`[API Rate Limit ERROR] Check failed for keyId: ${keyId}. Redis outage or connection issue:`, err);
+    
+    // Fail-closed for high-cost actions (AI / Scans) to prevent cost abuse during outages
+    if (isHighCost) {
+      return { ok: false, remaining: 0 };
+    }
+    
+    // Fail-open for standard API calls
     return { ok: true, remaining: limit };
   }
 }
