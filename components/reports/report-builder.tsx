@@ -71,6 +71,15 @@ export function ReportBuilder({ programs, researchers, initialTemplates }: Props
   const [templates, setTemplates] = useState(initialTemplates);
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Dialog / Modal States
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleTemplateId, setScheduleTemplateId] = useState("");
+  const [scheduleFrequency, setScheduleFrequency] = useState("weekly");
+  const [scheduleEmails, setScheduleEmails] = useState("");
+
   function buildConfig(): ReportConfig {
     return {
       metrics, chartType,
@@ -105,10 +114,16 @@ export function ReportBuilder({ programs, researchers, initialTemplates }: Props
   }
 
   async function handleSaveTemplate() {
-    const name = window.prompt("Name this report template:");
-    if (!name) return;
+    if (!newTemplateName.trim()) {
+      toast.error("Template name is required");
+      return;
+    }
     try {
-      await saveReportTemplate(name, buildConfig());
+      const config = buildConfig();
+      const saved = await saveReportTemplate(newTemplateName, config);
+      setTemplates((prev) => [...prev, saved as any]);
+      setNewTemplateName("");
+      setSaveOpen(false);
       toast.success("Template saved");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to save template");
@@ -125,19 +140,41 @@ export function ReportBuilder({ programs, researchers, initialTemplates }: Props
     }
   }
 
-  async function handleSchedule(templateId: string) {
-    const frequency = window.prompt('Schedule frequency: type "weekly" or "monthly"', "weekly");
-    if (frequency !== "weekly" && frequency !== "monthly") return;
-    const emailsRaw = window.prompt("Recipient email(s), comma-separated:");
-    if (!emailsRaw) return;
-    const emails = emailsRaw.split(",").map((e) => e.trim()).filter(Boolean);
+  async function handleScheduleSubmit() {
+    if (scheduleFrequency !== "weekly" && scheduleFrequency !== "monthly") {
+      toast.error("Invalid frequency");
+      return;
+    }
+    if (!scheduleEmails.trim()) {
+      toast.error("At least one recipient email is required");
+      return;
+    }
+    const emails = scheduleEmails.split(",").map((e) => e.trim()).filter(Boolean);
+    if (!emails.length) {
+      toast.error("Invalid emails");
+      return;
+    }
 
     try {
-      await createSchedule(templateId, frequency, emails);
-      toast.success(`Scheduled ${frequency} report to ${emails.length} recipient(s)`);
+      await createSchedule(scheduleTemplateId, scheduleFrequency, emails);
+      setScheduleOpen(false);
+      setScheduleEmails("");
+      toast.success(`Scheduled ${scheduleFrequency} report to ${emails.length} recipient(s)`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to schedule report");
     }
+  }
+
+  function triggerSaveModal() {
+    setNewTemplateName("");
+    setSaveOpen(true);
+  }
+
+  function triggerScheduleModal(templateId: string) {
+    setScheduleTemplateId(templateId);
+    setScheduleFrequency("weekly");
+    setScheduleEmails("");
+    setScheduleOpen(true);
   }
 
   async function handleToggleEmbed(template: Template) {
@@ -271,7 +308,7 @@ export function ReportBuilder({ programs, researchers, initialTemplates }: Props
           Run Report
         </button>
         {results && (
-          <button onClick={handleSaveTemplate} className="btn-ghost w-full flex items-center justify-center gap-2 text-xs">
+          <button onClick={triggerSaveModal} className="btn-ghost w-full flex items-center justify-center gap-2 text-xs">
             <Save className="w-3.5 h-3.5" /> Save as Template
           </button>
         )}
@@ -371,7 +408,7 @@ export function ReportBuilder({ programs, researchers, initialTemplates }: Props
                 <div key={t.id} className="flex items-center justify-between text-sm py-1.5">
                   <span>{t.name}</span>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => handleSchedule(t.id)} className="text-vault-muted hover:text-vault-teal" title="Schedule recurring delivery">
+                    <button onClick={() => triggerScheduleModal(t.id)} className="text-vault-muted hover:text-vault-teal" title="Schedule recurring delivery">
                       <Clock className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => handleToggleEmbed(t)} className="text-vault-muted hover:text-vault-teal" title="Toggle public embed link">
@@ -387,6 +424,74 @@ export function ReportBuilder({ programs, researchers, initialTemplates }: Props
           </div>
         )}
       </div>
+
+      {/* Save Template Modal */}
+      {saveOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="vault-card max-w-sm w-full p-6 space-y-4 animate-in">
+            <div>
+              <h3 className="text-base font-semibold">Save Report Template</h3>
+              <p className="text-xs text-vault-muted mt-1">Provide a name to save the current configuration for future runs and scheduling.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-vault-muted mb-1.5">Template Name</label>
+              <input
+                type="text"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                className="vault-input w-full text-sm"
+                placeholder="e.g. Monthly Executive Summary"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 text-xs">
+              <button onClick={() => setSaveOpen(false)} className="btn-ghost px-3 py-1.5">Cancel</button>
+              <button onClick={handleSaveTemplate} className="btn-teal px-4 py-1.5" disabled={!newTemplateName.trim()}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Report Modal */}
+      {scheduleOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="vault-card max-w-sm w-full p-6 space-y-4 animate-in">
+            <div>
+              <h3 className="text-base font-semibold">Schedule Recurring Delivery</h3>
+              <p className="text-xs text-vault-muted mt-1">Automatically run and deliver this report template via email on a schedule.</p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-vault-muted mb-1.5">Frequency</label>
+                <select
+                  value={scheduleFrequency}
+                  onChange={(e) => setScheduleFrequency(e.target.value)}
+                  className="vault-input w-full text-sm"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-vault-muted mb-1.5">Recipients</label>
+                <input
+                  type="text"
+                  value={scheduleEmails}
+                  onChange={(e) => setScheduleEmails(e.target.value)}
+                  className="vault-input w-full text-sm"
+                  placeholder="email1@domain.com, email2@domain.com"
+                  autoFocus
+                />
+                <span className="text-[10px] text-vault-muted mt-1 block">Comma-separated email addresses.</span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 text-xs">
+              <button onClick={() => setScheduleOpen(false)} className="btn-ghost px-3 py-1.5">Cancel</button>
+              <button onClick={handleScheduleSubmit} className="btn-teal px-4 py-1.5" disabled={!scheduleEmails.trim()}>Schedule</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
