@@ -2,7 +2,7 @@ import { createClient }      from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link                   from "next/link";
 import {
-  ChevronLeft, Github, ExternalLink, AlertTriangle,
+  ChevronLeft, GitBranch, ExternalLink, AlertTriangle,
   Shield, Zap, FileCode, Code2,
 } from "lucide-react";
 import { RescanButton }      from "@/components/code-quality/rescan-button";
@@ -13,9 +13,10 @@ import type { CodeFinding }  from "@/lib/ai/code-review";
 import type { SmartContractFinding } from "@/lib/ai/smart-contract-audit";
 import { VaultContextSetter } from "@/components/vault/vault-context-setter";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const supabase = createClient();
   const { data } = await supabase.from("code_repos").select("repo_name").eq("id", params.id).single();
   return { title: data?.repo_name ?? "Repository" };
@@ -51,7 +52,8 @@ function scoreRing(score: number): string {
   return "stroke-red-400";
 }
 
-export default async function CodeScanDetailPage({ params }: Props) {
+export default async function CodeScanDetailPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -103,7 +105,7 @@ export default async function CodeScanDetailPage({ params }: Props) {
           </Link>
           <div>
             <h1 className="text-lg font-semibold flex items-center gap-2">
-              <Github className="w-4 h-4 text-vault-muted" />
+              <GitBranch className="w-4 h-4 text-vault-muted" />
               {repo.owner_name}/{repo.repo_name}
             </h1>
             <p className="text-sm text-vault-muted mt-0.5 flex items-center gap-2">

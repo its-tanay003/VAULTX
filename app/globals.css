@@ -1,6 +1,100 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@theme {
+  --color-vault-bg: #09090b;
+  --color-vault-surface: #111113;
+  --color-vault-elevated: #18181b;
+  --color-vault-border: #27272a;
+  --color-vault-border-bright: #3f3f46;
+  --color-vault-teal: #2dd4bf;
+  --color-vault-teal-dim: #14b8a6;
+  --color-vault-teal-glow: rgba(45,212,191,0.15);
+  --color-vault-teal-faint: rgba(45,212,191,0.06);
+  --color-vault-muted: #71717a;
+  --color-vault-subtle: #a1a1aa;
+  --color-vault-text: #fafafa;
+  --color-vault-danger: #ef4444;
+  --color-vault-warning: #f59e0b;
+  --color-vault-success: #22c55e;
+  --color-vault-info: #3b82f6;
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: var(--font-geist-sans), sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.4s ease-out;
+  --animate-fade-up: fade-up 0.5s ease-out;
+  --animate-shimmer: shimmer 2s linear infinite;
+  --animate-teal-pulse: teal-pulse 2s ease-in-out infinite;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-scan-line: scan-line 8s linear infinite;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+  @keyframes teal-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(45,212,191,0); }
+    50% { box-shadow: 0 0 20px 4px rgba(45,212,191,0.2); }
+  }
+  @keyframes scan-line {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+  }
+}
 
 /* ─── VAULTX Design System ─────────────────────────── */
 @layer base {
@@ -262,11 +356,11 @@
   }
 
   .vault-textarea {
-    @apply vault-input resize-none min-h-[100px];
+    @apply px-3 py-2.5 rounded-lg text-sm w-full bg-vault-surface border border-vault-border text-vault-text placeholder:text-vault-muted focus:outline-none focus:border-vault-teal/50 focus:ring-1 focus:ring-vault-teal/30 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed resize-none min-h-[100px];
   }
 
   .vault-select {
-    @apply vault-input appearance-none cursor-pointer;
+    @apply px-3 py-2.5 rounded-lg text-sm w-full bg-vault-surface border border-vault-border text-vault-text placeholder:text-vault-muted focus:outline-none focus:border-vault-teal/50 focus:ring-1 focus:ring-vault-teal/30 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer;
   }
 
   /* Form field label */

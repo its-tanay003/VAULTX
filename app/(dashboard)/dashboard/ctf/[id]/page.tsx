@@ -9,9 +9,10 @@ import { CompetitionStatusControl } from "@/components/ctf/competition-status-co
 import { formatDate }               from "@/lib/utils";
 import type { Metadata }            from "next";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const supabase = createClient();
   const { data } = await supabase.from("ctf_competitions").select("title").eq("id", params.id).single();
   return { title: data?.title ?? "CTF" };
@@ -24,7 +25,8 @@ const DIFF_CFG = {
   insane: { cls: "text-red-400 bg-red-950/50 border-red-900/50",             label: "Insane" },
 };
 
-export default async function CTFManagePage({ params }: Props) {
+export default async function CTFManagePage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

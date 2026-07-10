@@ -20,9 +20,10 @@ const STATUS_CFG: Record<RewardStatus, { label: string; cls: string }> = {
   declined: { label: "Declined", cls: "text-red-400 bg-red-950/50 border-red-900/50" },
 };
 
-interface Props { searchParams: { status?: string } }
+interface Props { searchParams: Promise<{ status?: string }> }
 
-export default async function OrgRewardsPage({ searchParams }: Props) {
+export default async function OrgRewardsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

@@ -27,10 +27,11 @@ const STATUS_STYLES: Record<ProgramStatus, { dot: string; badge: string }> = {
 };
 
 interface Props {
-  searchParams: { status?: string; q?: string };
+  searchParams: Promise<{ status?: string; q?: string }>;
 }
 
-export default async function ProgramsPage({ searchParams }: Props) {
+export default async function ProgramsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const supabase   = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

@@ -5,11 +5,12 @@ import { ChevronLeft, Bug }   from "lucide-react";
 import { addFinding }         from "@/app/actions/ptaas";
 import type { Metadata }      from "next";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
 export const metadata: Metadata = { title: "Add Finding" };
 
-export default async function NewFindingPage({ params }: Props) {
+export default async function NewFindingPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { connectRepo }   from "@/app/actions/code-quality";
 import { toast }         from "sonner";
-import { Github, Plus, Loader2 } from "lucide-react";
+import { GitBranch, Plus, Loader2 } from "lucide-react";
 
 export function ConnectRepoForm() {
   const [url,     setUrl]     = useState("");
@@ -41,7 +41,7 @@ export function ConnectRepoForm() {
   return (
     <div className="vault-card p-5">
       <div className="flex items-center gap-2 mb-3">
-        <Github className="w-4 h-4 text-vault-teal" />
+        <GitBranch className="w-4 h-4 text-vault-teal" />
         <h3 className="text-sm font-medium">Connect repository</h3>
       </div>
       <div className="flex gap-2">

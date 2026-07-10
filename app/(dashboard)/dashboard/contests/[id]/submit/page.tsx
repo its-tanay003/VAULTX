@@ -2,17 +2,18 @@ import { createClient }      from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link                   from "next/link";
 import {
-  ChevronLeft, Scale, Github, DollarSign,
+  ChevronLeft, Scale, GitBranch, DollarSign,
   ExternalLink, Bug, CheckCircle2,
 } from "lucide-react";
 import { submitFinding }      from "@/app/actions/contests";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import type { Metadata }      from "next";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 export const metadata: Metadata = { title: "Submit Finding" };
 
-export default async function SubmitFindingPage({ params }: Props) {
+export default async function SubmitFindingPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -57,7 +58,7 @@ export default async function SubmitFindingPage({ params }: Props) {
             {owner && repo && (
               <a href={contest.repo_url} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-1 text-vault-teal hover:underline">
-                <Github className="w-3.5 h-3.5" /> {owner}/{repo} <ExternalLink className="w-3 h-3" />
+                <GitBranch className="w-3.5 h-3.5" /> {owner}/{repo} <ExternalLink className="w-3 h-3" />
               </a>
             )}
             <span className="text-vault-teal font-medium flex items-center gap-1">

@@ -4,18 +4,20 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
 export function createClient(): SupabaseClient<Database, "public", any> {
-  const cookieStore = cookies();
-
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key",
     {
       cookies: {
-        getAll()          { return cookieStore.getAll(); },
-        setAll(cookiesToSet: any[]) {
+        async getAll() { 
+          const store = await cookies();
+          return store.getAll(); 
+        },
+        async setAll(cookiesToSet: any[]) {
           try {
+            const store = await cookies();
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              store.set(name, value, options)
             );
           } catch {
             // Server Component — can't set cookies here, middleware handles refresh

@@ -6,7 +6,7 @@ import { JudgePanel }         from "@/components/contests/judge-panel";
 import { AIDuplicatePanel }   from "@/components/contests/ai-duplicate-panel";
 import type { Metadata }      from "next";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 export const metadata: Metadata = { title: "Judge Contest" };
 
 const SEV_CFG: Record<string, { cls: string; label: string }> = {
@@ -17,7 +17,8 @@ const SEV_CFG: Record<string, { cls: string; label: string }> = {
   info:     { label: "Info",     cls: "text-zinc-400 bg-zinc-800/50 border-zinc-700/50"       },
 };
 
-export default async function JudgePage({ params }: Props) {
+export default async function JudgePage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

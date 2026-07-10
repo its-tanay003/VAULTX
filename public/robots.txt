@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /dashboard/
 Disallow: /settings/
-Sitemap: https://vaultx.com/sitemap.xml
+Sitemap: https://vaultx.io/sitemap.xml

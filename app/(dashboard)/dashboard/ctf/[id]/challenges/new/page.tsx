@@ -5,10 +5,11 @@ import { ChevronLeft, Flag }  from "lucide-react";
 import { createChallenge }    from "@/app/actions/ctf";
 import type { Metadata }      from "next";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 export const metadata: Metadata = { title: "Add Challenge" };
 
-export default async function NewChallengePage({ params }: Props) {
+export default async function NewChallengePage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

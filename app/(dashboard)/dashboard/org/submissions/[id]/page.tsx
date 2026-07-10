@@ -15,9 +15,10 @@ import { formatDate, formatRelativeTime } from "@/lib/utils";
 import type { Metadata }                  from "next";
 import type { SubmissionStatus, SeverityLevel } from "@/lib/supabase/types";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const supabase = createClient();
   const { data } = await supabase.from("submissions").select("title").eq("id", params.id).single();
   return { title: data?.title ?? "Submission" };
@@ -42,7 +43,8 @@ const STATUS_CFG: Record<SubmissionStatus, { label: string; color: string; bg: s
   resolved:   { label: "Resolved",  color: "text-teal-400",    bg: "bg-teal-950/50 border-teal-900/50"          },
 };
 
-export default async function OrgSubmissionDetailPage({ params }: Props) {
+export default async function OrgSubmissionDetailPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

@@ -6,12 +6,7 @@ import { PageTransition }          from "@/components/providers/page-transition"
 import { CommandPaletteProvider }  from "@/components/providers/command-palette-provider";
 import { SkipToContent }           from "@/components/ui/skip-to-content";
 import { VaultContextProvider } from "@/components/vault/vault-context";
-import dynamic from "next/dynamic";
-
-const VaultWidget = dynamic(
-  () => import("@/components/vault/vault-widget").then((mod) => mod.VaultWidget),
-  { ssr: false }
-);
+import { VaultWidgetWrapper } from "@/components/vault/vault-widget-wrapper";
 
 /**
  * UPDATED Week 7 (final):
@@ -54,7 +49,7 @@ export default async function DashboardLayout({
             </main>
           </div>
         </div>
-        <VaultWidget role={profile.role === "researcher" ? "researcher" : "admin"} />
+        <VaultWidgetWrapper role={profile.role === "researcher" ? "researcher" : "admin"} />
       </VaultContextProvider>
     </CommandPaletteProvider>
   );

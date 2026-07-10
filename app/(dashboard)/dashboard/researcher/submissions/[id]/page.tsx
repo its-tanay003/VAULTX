@@ -11,9 +11,10 @@ import type { Metadata }            from "next";
 import type { SubmissionStatus, SeverityLevel } from "@/lib/supabase/types";
 import { RealtimeSubmissionStatus } from "@/components/realtime/realtime-submission-status";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const supabase = createClient();
   const { data } = await supabase.from("submissions").select("title").eq("id", params.id).single();
   return { title: data?.title ?? "Report" };
@@ -38,7 +39,8 @@ const SEV_CONFIG: Record<SeverityLevel, { label: string; cls: string; dot: strin
   info:     { label: "Info",     cls: "text-zinc-400 bg-zinc-800/50 border-zinc-700/50",       dot: "bg-zinc-400"   },
 };
 
-export default async function SubmissionDetailPage({ params }: Props) {
+export default async function SubmissionDetailPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

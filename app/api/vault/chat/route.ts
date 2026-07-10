@@ -5,6 +5,7 @@ import {
   type VaultContext,
 } from "@/lib/ai/vault-agent";
 import { validateProposedAction } from "@/lib/ai/vault-actions";
+import { validateCsrf } from "@/lib/api/csrf";
 import type { UserRole } from "@/lib/supabase/types";
 
 export const runtime = "nodejs";
@@ -20,7 +21,6 @@ export const runtime = "nodejs";
  * completes.
  */
 export async function POST(request: Request) {
-  const { validateCsrf } = await import("@/lib/api/csrf");
   const csrfError = validateCsrf(request);
   if (csrfError) return csrfError;
 

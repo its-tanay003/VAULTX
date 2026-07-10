@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect }      from "next/navigation";
 import Link               from "next/link";
 import {
-  Code2, Github, Plus, ChevronRight, CheckCircle2,
+  Code2, GitBranch, Plus, ChevronRight, CheckCircle2,
   AlertTriangle, Clock, Loader2,
 } from "lucide-react";
 import { ConnectRepoForm } from "@/components/code-quality/connect-repo-form";
@@ -56,7 +56,7 @@ export default async function CodeQualityPage() {
       {/* Connected repos */}
       {!repos?.length ? (
         <div className="vault-card flex flex-col items-center justify-center py-16 text-center">
-          <Github className="w-8 h-8 text-vault-muted mb-3 opacity-50" />
+          <GitBranch className="w-8 h-8 text-vault-muted mb-3 opacity-50" />
           <p className="font-medium mb-1">No repositories connected</p>
           <p className="text-sm text-vault-muted">
             Connect a public GitHub repo above to run your first scan
@@ -77,7 +77,7 @@ export default async function CodeQualityPage() {
                 className="flex items-center gap-4 p-4 hover:bg-vault-elevated/50 transition-colors group"
               >
                 <div className="w-9 h-9 rounded-lg bg-vault-elevated border border-vault-border flex items-center justify-center shrink-0">
-                  <Github className="w-4 h-4 text-vault-subtle" />
+                  <GitBranch className="w-4 h-4 text-vault-subtle" />
                 </div>
 
                 <div className="flex-1 min-w-0">

@@ -13,12 +13,12 @@ import type { SubmissionStatus, SeverityLevel } from "@/lib/supabase/types";
 export const metadata: Metadata = { title: "Submissions" };
 
 interface Props {
-  searchParams: {
+  searchParams: Promise<{
     status?:   string;
     severity?: string;
     program?:  string;
     q?:        string;
-  };
+  }>;
 }
 
 const STATUS_CFG: Record<SubmissionStatus, { label: string; dot: string; badge: string }> = {
@@ -46,7 +46,8 @@ const TRIAGE_TABS = [
   { label: "All",          statuses: [] },
 ];
 
-export default async function OrgSubmissionsPage({ searchParams }: Props) {
+export default async function OrgSubmissionsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

@@ -2,7 +2,7 @@ import { createClient }      from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link                   from "next/link";
 import {
-  ChevronLeft, Scale, Github, DollarSign, Users, Bug,
+  ChevronLeft, Scale, GitBranch, DollarSign, Users, Bug,
   ExternalLink, Calendar, CheckCircle2, XCircle,
 } from "lucide-react";
 import { ContestStatusControl, FinalizeButton } from "@/components/contests/contest-status-control";
@@ -11,9 +11,10 @@ import { computeContestStats }  from "@/lib/ai/contest-distribution";
 import { formatDate, formatCurrency, truncate } from "@/lib/utils";
 import type { Metadata } from "next";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const supabase = createClient();
   const { data } = await supabase.from("audit_contests").select("title").eq("id", params.id).single();
   return { title: data?.title ?? "Contest" };
@@ -34,7 +35,8 @@ const FIND_STATUS_CFG: Record<string, { label: string; cls: string }> = {
   duplicate: { label: "Duplicate", cls: "text-zinc-400 bg-zinc-800/50 border-zinc-700/50"         },
 };
 
-export default async function ContestDetailPage({ params }: Props) {
+export default async function ContestDetailPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -82,7 +84,7 @@ export default async function ContestDetailPage({ params }: Props) {
             {owner && repo && (
               <a href={contest.repo_url} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-1 text-vault-teal hover:underline">
-                <Github className="w-3.5 h-3.5" /> {owner}/{repo} <ExternalLink className="w-3 h-3" />
+                <GitBranch className="w-3.5 h-3.5" /> {owner}/{repo} <ExternalLink className="w-3 h-3" />
               </a>
             )}
             <span className="flex items-center gap-1">

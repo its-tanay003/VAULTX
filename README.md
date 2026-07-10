@@ -61,17 +61,17 @@ cp .env.example .env.local
 ```
 Fill in the following:
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ_anon_public_key_placeholder_xxxxxxx
+SUPABASE_SERVICE_ROLE_KEY=eyJ_service_role_key_placeholder_xxxxxxx
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-ANTHROPIC_API_KEY=sk-ant-v1...
-GEMINI_API_KEY=AIzaSy...
-VAULT_INTERNAL_SECRET=your_32_byte_hex_secret
-RESEND_API_KEY=re_...
+ANTHROPIC_API_KEY=sk_test_anthropic_api_key_xxxxxxxxxxxxx
+GEMINI_API_KEY=AIzaSy_gemini_api_key_placeholder_xxxxxxx
+VAULT_INTERNAL_SECRET=your_32_byte_hex_secret_placeholder
+RESEND_API_KEY=re_resend_api_key_placeholder_xxxxxxxxxxx
 RESEND_FROM_EMAIL=noreply@your-domain.com
-UPSTASH_REDIS_REST_URL=https://...
-UPSTASH_REDIS_REST_TOKEN=...
+UPSTASH_REDIS_REST_URL=https://your-database-id.upstash.io
+UPSTASH_REDIS_REST_TOKEN=upstash_redis_token_placeholder_xxxxxxx
 ```
 
 #### 4. Configure Authentication Providers

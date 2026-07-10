@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { validateProposedAction, executeAction } from "@/lib/ai/vault-actions";
+import { validateCsrf } from "@/lib/api/csrf";
 import type { UserRole } from "@/lib/supabase/types";
 
 /**
@@ -18,7 +19,6 @@ import type { UserRole } from "@/lib/supabase/types";
  * an AI-triggered action is exactly as attributable as a manual one.
  */
 export async function POST(request: Request) {
-  const { validateCsrf } = await import("@/lib/api/csrf");
   const csrfError = validateCsrf(request);
   if (csrfError) return csrfError;
 

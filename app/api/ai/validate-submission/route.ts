@@ -2,6 +2,8 @@ import { NextResponse }        from "next/server";
 import { validateSubmission }  from "@/lib/ai/validate";
 import { createClient }        from "@/lib/supabase/server";
 import { notifySubmissionReceived } from "@/lib/notifications/service";
+import { validateCsrf }        from "@/lib/api/csrf";
+
 
 /**
  * UPDATED app/api/ai/validate-submission/route.ts
@@ -13,7 +15,6 @@ import { notifySubmissionReceived } from "@/lib/notifications/service";
  */
 export async function POST(request: Request) {
   try {
-    const { validateCsrf } = await import("@/lib/api/csrf");
     const csrfError = validateCsrf(request);
     if (csrfError) return csrfError;
 

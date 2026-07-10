@@ -11,7 +11,7 @@ import type { SubmissionStatus }      from "@/lib/supabase/types";
 
 export const metadata: Metadata = { title: "My Reports" };
 
-interface Props { searchParams: { status?: string; q?: string } }
+interface Props { searchParams: Promise<{ status?: string; q?: string }> }
 
 const STATUS_MAP: Record<SubmissionStatus, { label: string; dot: string; badge: string }> = {
   new:        { label: "New",       dot: "bg-sky-400",     badge: "text-sky-400 bg-sky-950/50 border-sky-900/50"          },
@@ -29,7 +29,8 @@ const SEV_DOTS: Record<string, string> = {
   low: "bg-blue-400", info: "bg-zinc-500",
 };
 
-export default async function MySubmissionsPage({ searchParams }: Props) {
+export default async function MySubmissionsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

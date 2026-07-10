@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect }      from "next/navigation";
 import Link               from "next/link";
 import {
-  Zap, Plus, Github, FileText, ChevronRight, Clock, Bug,
+  Zap, Plus, GitBranch, FileText, ChevronRight, Clock, Bug,
 } from "lucide-react";
 import { EmptyState }    from "@/components/ui/empty-state";
 import { AggressionBadge } from "@/components/red-team/aggression-badge";
@@ -85,7 +85,7 @@ export default async function AIRedTeamPage() {
               >
                 <div className="w-9 h-9 rounded-lg bg-vault-teal/10 border border-vault-teal/20 flex items-center justify-center shrink-0">
                   {target.target_type === "github_repo"
-                    ? <Github className="w-4 h-4 text-vault-teal" />
+                    ? <GitBranch className="w-4 h-4 text-vault-teal" />
                     : <FileText className="w-4 h-4 text-vault-teal" />}
                 </div>
                 <div className="flex-1 min-w-0">

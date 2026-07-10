@@ -14,15 +14,17 @@ import {
 } from "@/lib/utils";
 import type { Metadata }         from "next";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const supabase = createClient();
   const { data } = await supabase.from("programs").select("name").eq("id", params.id).single();
   return { title: data?.name ?? "Program" };
 }
 
-export default async function ProgramDetailPage({ params }: Props) {
+export default async function ProgramDetailPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

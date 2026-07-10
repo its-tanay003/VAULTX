@@ -5,11 +5,22 @@
 -- 1. Sync any missing profiles.org_id records into memberships table
 -- Ensures memberships contains all existing organization associations.
 INSERT INTO public.memberships (org_id, user_id, role, status)
-SELECT org_id, id, LOWER(role::text), 'active'
+SELECT
+  org_id,
+  id,
+  -- profiles.role describes the account type ('org' = org account owner).
+  -- memberships.role describes the relationship role within an org.
+  -- 'org' is not a valid membership role; map it to 'owner'.
+  CASE LOWER(role::text)
+    WHEN 'org'     THEN 'owner'
+    WHEN 'triager' THEN 'triager'
+    ELSE                'member'
+  END,
+  'active'
 FROM public.profiles
 WHERE org_id IS NOT NULL
   AND role IN ('org', 'triager')
-ON CONFLICT (org_id, user_id) DO UPDATE 
+ON CONFLICT (org_id, user_id) DO UPDATE
 SET role = EXCLUDED.role;
 
 -- 2. Sync any missing memberships records back to profiles.org_id
@@ -49,9 +60,18 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.org_id IS NOT NULL THEN
     INSERT INTO public.memberships (org_id, user_id, role, status)
-    VALUES (NEW.org_id, NEW.id, LOWER(NEW.role::text), 'active')
+    VALUES (
+      NEW.org_id,
+      NEW.id,
+      CASE LOWER(NEW.role::text)
+        WHEN 'org'     THEN 'owner'
+        WHEN 'triager' THEN 'triager'
+        ELSE                'member'
+      END,
+      'active'
+    )
     ON CONFLICT (org_id, user_id) DO UPDATE
-    SET role = LOWER(EXCLUDED.role);
+    SET role = EXCLUDED.role;
   ELSE
     -- If user set org_id to null, remove active memberships
     DELETE FROM public.memberships

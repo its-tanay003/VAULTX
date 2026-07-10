@@ -1,12 +1,7 @@
 import { notFound } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { getEmbeddedReport } from "@/app/actions/reports";
-import dynamic from "next/dynamic";
-
-const EmbedChart = dynamic(
-  () => import("@/components/reports/embed-chart").then((mod) => mod.EmbedChart),
-  { ssr: false }
-);
+import { EmbedChartWrapper } from "@/components/reports/embed-chart-wrapper";
 
 /**
  * GET /r/[token]
@@ -21,7 +16,8 @@ const EmbedChart = dynamic(
  * client-facing public link shouldn't expose which named researcher
  * found what, or their individual earnings.
  */
-export default async function EmbedReportPage({ params }: { params: { token: string } }) {
+export default async function EmbedReportPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const report = await getEmbeddedReport(params.token);
   if (!report) notFound();
 
@@ -36,7 +32,7 @@ export default async function EmbedReportPage({ params }: { params: { token: str
 
         <div className="space-y-6">
           {Object.entries(report.results).map(([key, value]) => (
-            <EmbedChart key={key} metricKey={key} data={value as { label: string; value: number }[]} chartType={report.config.chartType} />
+            <EmbedChartWrapper key={key} metricKey={key} data={value as { label: string; value: number }[]} chartType={report.config.chartType} />
           ))}
         </div>
       </div>

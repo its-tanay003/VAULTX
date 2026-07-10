@@ -1,6 +1,7 @@
 import { NextResponse }  from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createHash, timingSafeEqual } from "crypto";
+import { validateCsrf } from "@/lib/api/csrf";
 
 /**
  * POST /api/ctf/submit-flag
@@ -28,7 +29,6 @@ import { createHash, timingSafeEqual } from "crypto";
  */
 export async function POST(request: Request) {
   try {
-    const { validateCsrf } = await import("@/lib/api/csrf");
     const csrfError = validateCsrf(request);
     if (csrfError) return csrfError;
 

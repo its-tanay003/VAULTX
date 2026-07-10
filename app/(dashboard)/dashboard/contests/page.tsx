@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect }      from "next/navigation";
 import Link               from "next/link";
 import {
-  Scale, Plus, Github, DollarSign, Calendar, ChevronRight, Users,
+  Scale, Plus, GitBranch, DollarSign, Calendar, ChevronRight, Users,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDate, formatCurrency } from "@/lib/utils";
@@ -95,7 +95,7 @@ export default async function ContestsPage() {
                   <p className="text-xs text-vault-muted mt-0.5 flex items-center gap-2 flex-wrap">
                     {owner && repo && (
                       <span className="flex items-center gap-1">
-                        <Github className="w-3 h-3" /> {owner}/{repo}
+                        <GitBranch className="w-3 h-3" /> {owner}/{repo}
                       </span>
                     )}
                     <span className="flex items-center gap-1">

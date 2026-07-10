@@ -12,10 +12,11 @@ import type { ProgramType } from "@/lib/supabase/types";
 export const metadata: Metadata = { title: "Browse Programs" };
 
 interface Props {
-  searchParams: { q?: string; type?: string };
+  searchParams: Promise<{ q?: string; type?: string }>;
 }
 
-export default async function ResearcherProgramsPage({ searchParams }: Props) {
+export default async function ResearcherProgramsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

@@ -9,7 +9,8 @@ import { generateEngagementReportPdf } from "@/lib/ptaas/report-generation";
  * route and VAULT's Agent Mode "generate report" action call the
  * identical function, not parallel implementations.
  */
-export async function GET(_request: Request, { params }: { params: { engagementId: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ engagementId: string }> }) {
+  const params = await props.params;
   try {
     const { bytes, sha256, filename } = await generateEngagementReportPdf(params.engagementId);
 

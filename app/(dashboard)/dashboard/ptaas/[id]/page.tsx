@@ -14,9 +14,10 @@ import type { Metadata }     from "next";
 import type { SeverityLevel } from "@/lib/supabase/types";
 import { VaultContextSetter } from "@/components/vault/vault-context-setter";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const supabase = createClient();
   const { data } = await supabase.from("pentest_engagements").select("name").eq("id", params.id).single();
   return { title: data?.name ?? "Engagement" };
@@ -30,7 +31,8 @@ const SEV_CFG: Record<SeverityLevel, { label: string; cls: string }> = {
   info:     { label: "Info",     cls: "text-zinc-400 bg-zinc-800/50 border-zinc-700/50"        },
 };
 
-export default async function EngagementDetailPage({ params }: Props) {
+export default async function EngagementDetailPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

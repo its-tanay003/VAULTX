@@ -2,7 +2,7 @@ import { createClient }      from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link                   from "next/link";
 import {
-  ChevronLeft, Zap, Github, FileText, Bug, ExternalLink,
+  ChevronLeft, Zap, GitBranch, FileText, Bug, ExternalLink,
 } from "lucide-react";
 import { RunScanButton }       from "@/components/red-team/run-scan-button";
 import { TargetStatusToggle }  from "@/components/red-team/target-status-toggle";
@@ -12,9 +12,10 @@ import { formatRelativeTime, formatDate } from "@/lib/utils";
 import type { Metadata }       from "next";
 import { VaultContextSetter } from "@/components/vault/vault-context-setter";
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const supabase = createClient();
   const { data } = await supabase.from("red_team_targets").select("name").eq("id", params.id).single();
   return { title: data?.name ?? "Target" };
@@ -26,7 +27,8 @@ const SCAN_STATUS_CFG: Record<string, { label: string; cls: string }> = {
   failed:   { label: "Failed",   cls: "text-red-400 bg-red-950/50 border-red-900/50"              },
 };
 
-export default async function TargetDetailPage({ params }: Props) {
+export default async function TargetDetailPage(props: Props) {
+  const params = await props.params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -72,7 +74,7 @@ export default async function TargetDetailPage({ params }: Props) {
         <div className="flex-1">
           <h1 className="text-lg font-semibold flex items-center gap-2">
             {target.target_type === "github_repo"
-              ? <Github className="w-4 h-4 text-vault-teal" />
+              ? <GitBranch className="w-4 h-4 text-vault-teal" />
               : <FileText className="w-4 h-4 text-vault-teal" />}
             {target.name}
           </h1>
