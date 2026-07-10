@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, Suspense } from "react";
 import { useSearchParams, useRouter }       from "next/navigation";
 import { createSubmission }                 from "@/app/actions/submissions";
 import { createClient }                     from "@/lib/supabase/client";
@@ -67,7 +67,7 @@ const SEVERITY_OPTIONS: {
   },
 ];
 
-export default function NewSubmissionPage() {
+export function NewSubmissionForm() {
   const searchParams = useSearchParams();
   const programId    = searchParams.get("program") ?? "";
   const router       = useRouter();
@@ -427,6 +427,18 @@ Attack vector: Network / Attack complexity: Low / Privileges: None`}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NewSubmissionPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-2xl mx-auto space-y-5 animate-in">
+        <div className="text-sm text-vault-muted">Loading...</div>
+      </div>
+    }>
+      <NewSubmissionForm />
+    </Suspense>
   );
 }
 
