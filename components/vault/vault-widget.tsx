@@ -42,6 +42,20 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  // Lets the command palette (or any other part of the app) open VAULT
+  // and optionally send a pre-filled message, without needing a shared
+  // React context just for this — a small, deliberate decoupling rather
+  // than a bigger state-management refactor for one integration point.
+  useEffect(() => {
+    function handleOpen(e: Event) {
+      setOpen(true);
+      const prefill = (e as CustomEvent<{ prefill?: string }>).detail?.prefill;
+      if (prefill) setInput(prefill);
+    }
+    window.addEventListener("vault:open", handleOpen);
+    return () => window.removeEventListener("vault:open", handleOpen);
+  }, []);
+
   async function send(text: string) {
     if (!text.trim() || streaming) return;
     setInput("");

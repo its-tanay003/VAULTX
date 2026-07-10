@@ -38,3 +38,26 @@ export async function cancelVaultAction(actionId: string): Promise<void> {
   if (!user) throw new Error("Not authenticated");
   await supabase.from("vault_actions").update({ status: "cancelled" }).eq("id", actionId).eq("user_id", user.id).eq("status", "proposed");
 }
+
+/** Reads the current user's Agent Mode toggle + consent status, for the settings UI. */
+export async function getVaultAgentModeStatus(): Promise<{ enabled: boolean; consentGiven: boolean }> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data } = await supabase
+    .from("profiles").select("vault_agent_mode_enabled, vault_agent_consent_at").eq("id", user.id).single();
+
+  return {
+    enabled: data?.vault_agent_mode_enabled ?? true,
+    consentGiven: !!data?.vault_agent_consent_at,
+  };
+}
+
+/** Enables/disables Agent Mode for the current user — a durable, per-user setting per the design doc §9, not a recurring dialog. */
+export async function setVaultAgentModeEnabled(enabled: boolean): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  await supabase.from("profiles").update({ vault_agent_mode_enabled: enabled }).eq("id", user.id);
+}

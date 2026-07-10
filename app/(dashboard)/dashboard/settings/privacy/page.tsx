@@ -5,6 +5,7 @@ import { toast }               from "sonner";
 import { Loader2, Save, Download, Clock } from "lucide-react";
 import { updateUserSettings, requestDataExport } from "@/app/actions/settings";
 import { SectionCard, FieldRow, SettingsToggle } from "@/components/settings/section-card";
+import { VaultAgentModeToggle } from "@/components/vault/vault-agent-mode-toggle";
 import { cn } from "@/lib/utils";
 
 type Visibility = "public" | "org_only" | "private";
@@ -57,6 +58,11 @@ export default function PrivacySettingsPage() {
 
   return (
     <div className="space-y-5 animate-in">
+      {/* VAULT Agent Mode */}
+      <SectionCard title="AI Assistant" description="Control what VAULT is allowed to do on your behalf">
+        <VaultAgentModeToggle />
+      </SectionCard>
+
       {/* Visibility */}
       <SectionCard title="Profile Visibility" description="Control who can see your public profile">
         <div className="space-y-2">

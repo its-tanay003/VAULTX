@@ -24,9 +24,10 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("role, vault_agent_mode_enabled").eq("id", user.id).single();
   const realRole: UserRole = profile?.role ?? "researcher";
   const role: "researcher" | "admin" = realRole === "researcher" ? "researcher" : "admin";
+  const agentModeEnabled = profile?.vault_agent_mode_enabled ?? true;
 
   const body = await request.json().catch(() => null);
   const message: string | undefined = body?.message;
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const system = buildSystemPrompt(role, realRole, contextData);
+  const system = buildSystemPrompt(role, realRole, contextData, agentModeEnabled);
 
   const encoder = new TextEncoder();
   let assembled = "";
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
           await supabase.from("vault_messages").insert({ conversation_id: conversationId, role: "assistant", content: textOnly || assembled });
           await supabase.from("vault_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
 
-          if (actionMatch) {
+          if (actionMatch && agentModeEnabled) {
             try {
               const parsed = JSON.parse(actionMatch[1]);
               const validated = validateProposedAction(realRole, parsed.type, parsed.params ?? {});

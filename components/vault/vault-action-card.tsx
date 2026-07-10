@@ -80,8 +80,13 @@ export function VaultActionCard({ action }: { action: ProposedAction }) {
       )}
 
       {state === "succeeded" && (
-        <div className="flex items-center gap-2 text-xs text-emerald-400 pt-1">
-          <CheckCircle2 className="w-3.5 h-3.5" /> {resultMessage}
+        <div className="space-y-1 pt-1">
+          <div className="flex items-center gap-2 text-xs text-emerald-400">
+            <CheckCircle2 className="w-3.5 h-3.5" /> {resultMessage}
+          </div>
+          <p className="text-[10px] text-vault-muted">
+            Executed by you via VAULT · {new Date().toLocaleString()} · logged to your audit history
+          </p>
         </div>
       )}
 

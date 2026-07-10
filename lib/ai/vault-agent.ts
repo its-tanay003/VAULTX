@@ -55,11 +55,12 @@ You can help with:
 
 CRITICAL: You never approve rewards, set final severity, or take any action — you only draft, suggest, and summarize. Every one of your outputs is advisory input to a human decision, stated explicitly here and enforced by this platform's core invariant.`;
 
-export function buildSystemPrompt(persona: "researcher" | "admin", realRole: UserRole, contextData: string): string {
+export function buildSystemPrompt(persona: "researcher" | "admin", realRole: UserRole, contextData: string, agentModeEnabled: boolean): string {
   const personaPrompt = persona === "researcher" ? RESEARCHER_PERSONA : ADMIN_PERSONA;
 
-  const availableActions = (Object.values(ACTION_REGISTRY) as typeof ACTION_REGISTRY[ActionType][])
-    .filter((def) => def.allowedRoles.includes(realRole));
+  const availableActions = agentModeEnabled
+    ? (Object.values(ACTION_REGISTRY) as typeof ACTION_REGISTRY[ActionType][]).filter((def) => def.allowedRoles.includes(realRole))
+    : [];
 
   const actionInstructions = availableActions.length
     ? `
@@ -67,7 +68,7 @@ export function buildSystemPrompt(persona: "researcher" | "admin", realRole: Use
 AGENT MODE — you can propose (never silently execute) these actions for this user, when their message clearly asks for something to be DONE, not just discussed:
 ${availableActions.map((a) => `- ${a.type}: ${a.describe({})} Requires: ${Object.keys(a.paramSchema).join(", ")}.`).join("\n")}
 
-To propose an action, end your response with a fenced block exactly like this (only when the user's context data above gives you the real id needed — never invent an id):
+To propose an action, end your response with a fenced block exactly like this (id-shaped params like repoId/engagementId/targetId/submissionId must come from the real context data above — never invent one; free-text params like "question" should be a real, specific message you've drafted, not a placeholder):
 
 \`\`\`vault-action
 {"type": "trigger_code_scan", "params": {"repoId": "the-real-uuid-from-context"}}

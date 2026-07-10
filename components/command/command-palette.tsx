@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { createClient }  from "@/lib/supabase/client";
 import {
   Search, Target, Bug, Trophy, BarChart3, Code2,
-  Bell, Settings, Plus, ArrowRight, CornerDownLeft,
+  Bell, Settings, Plus, ArrowRight, CornerDownLeft, Sparkles,
 } from "lucide-react";
 import type { UserRole } from "@/lib/supabase/types";
 
@@ -66,6 +66,19 @@ export function CommandPalette({ open, onClose, role }: Props) {
     { id: "nav-settings",      label: "Go to Settings",      icon: <Settings className="w-4 h-4" />, action: () => navigate("/dashboard/settings"), group: "Navigate" },
   ];
 
+  const VAULT_COMMANDS: CommandItem[] = isOrg ? [
+    { id: "vault-workload", label: "Ask VAULT: summarize my workload", icon: <Sparkles className="w-4 h-4" />, action: () => openVault("Summarize my current workload"), group: "VAULT" },
+    { id: "vault-scan",     label: "Ask VAULT to trigger a scan",      icon: <Sparkles className="w-4 h-4" />, action: () => openVault("Can you run a scan on the repo I'm viewing?"), group: "VAULT" },
+  ] : [
+    { id: "vault-scope",    label: "Ask VAULT: check scope",           icon: <Sparkles className="w-4 h-4" />, action: () => openVault("Is this in scope for the current program?"), group: "VAULT" },
+    { id: "vault-severity", label: "Ask VAULT: estimate severity",     icon: <Sparkles className="w-4 h-4" />, action: () => openVault("Can you help me estimate the severity of a bug I found?"), group: "VAULT" },
+  ];
+
+  function openVault(prefill: string) {
+    window.dispatchEvent(new CustomEvent("vault:open", { detail: { prefill } }));
+    onClose();
+  }
+
   function navigate(href: string) {
     router.push(href);
     onClose();
@@ -117,7 +130,7 @@ export function CommandPalette({ open, onClose, role }: Props) {
     }
   }, [open]);
 
-  const filteredStatic = [...NAV_COMMANDS, ...COMMON_COMMANDS].filter(
+  const filteredStatic = [...NAV_COMMANDS, ...COMMON_COMMANDS, ...VAULT_COMMANDS].filter(
     (cmd) => cmd.label.toLowerCase().includes(query.toLowerCase())
   );
 

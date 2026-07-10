@@ -26,10 +26,13 @@
 
 import { runScan, runWeb3Audit } from "@/app/actions/code-quality";
 import { triggerScan as triggerRedTeamScan } from "@/app/actions/red-team";
+import { requestMoreInfo } from "@/app/actions/triage";
 import { generateEngagementReportPdf } from "@/lib/ptaas/report-generation";
 import type { UserRole } from "@/lib/supabase/types";
 
-export type ActionType = "trigger_code_scan" | "trigger_web3_audit" | "generate_ptaas_report" | "trigger_red_team_scan";
+export type ActionType =
+  | "trigger_code_scan" | "trigger_web3_audit" | "generate_ptaas_report"
+  | "trigger_red_team_scan" | "request_more_info";
 
 export interface ActionDefinition {
   type: ActionType;
@@ -67,6 +70,12 @@ export const ACTION_REGISTRY: Record<ActionType, ActionDefinition> = {
     allowedRoles: ["org", "admin"],
     paramSchema: { targetId: "string" },
     describe: () => "Run an AI Red Team scan against this already-authorized target.",
+  },
+  request_more_info: {
+    type: "request_more_info",
+    allowedRoles: ["triager", "admin", "org"],
+    paramSchema: { submissionId: "string", question: "string" },
+    describe: (params) => `Send a "needs more info" request to the researcher: "${params.question ?? ""}"`,
   },
 };
 
@@ -125,6 +134,10 @@ export async function executeAction(type: ActionType, params: Record<string, str
       case "trigger_red_team_scan": {
         await triggerRedTeamScan(params.targetId);
         return { success: true, result: { targetId: params.targetId, message: "Red Team scan started" } };
+      }
+      case "request_more_info": {
+        await requestMoreInfo(params.submissionId, params.question);
+        return { success: true, result: { submissionId: params.submissionId, message: "Request sent to researcher" } };
       }
       default:
         return { success: false, error: "Unknown action type" };

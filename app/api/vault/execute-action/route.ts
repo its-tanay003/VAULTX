@@ -34,8 +34,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `This action is already ${action.status}` }, { status: 409 });
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("role, vault_agent_mode_enabled, vault_agent_consent_at").eq("id", user.id).single();
   const role: UserRole = profile?.role ?? "researcher";
+
+  if (profile?.vault_agent_mode_enabled === false) {
+    await supabase.from("vault_actions").update({ status: "cancelled", error: "Agent Mode is disabled for this account" }).eq("id", actionId);
+    return NextResponse.json({ error: "Agent Mode is disabled for your account — enable it in Settings to execute actions" }, { status: 403 });
+  }
 
   const revalidated = validateProposedAction(role, action.action_type, action.params as Record<string, unknown>);
   if (!revalidated) {
@@ -44,6 +49,12 @@ export async function POST(request: Request) {
   }
 
   await supabase.from("vault_actions").update({ status: "confirmed" }).eq("id", actionId);
+
+  // Record consent the first time this user ever confirms an Agent Mode
+  // action — durable, one-time, not a recurring dialog (design doc §9).
+  if (!profile?.vault_agent_consent_at) {
+    await supabase.from("profiles").update({ vault_agent_consent_at: new Date().toISOString() }).eq("id", user.id);
+  }
 
   const result = await executeAction(revalidated.type, revalidated.params);
 
