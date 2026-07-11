@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-cache: "npm"
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint check
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: "https://mock-project-id.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key"
+          SUPABASE_SERVICE_ROLE_KEY: "mock-service-role-key"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          ANTHROPIC_API_KEY: "mock-anthropic-key"
+          GEMINI_API_KEY: "mock-gemini-key"
+          VAULT_INTERNAL_SECRET: "0000000000000000000000000000000000000000000000000000000000000000"
+          RESEND_API_KEY: "mock-resend-key"
+          RESEND_FROM_EMAIL: "noreply@vaultx.io"
+          UPSTASH_REDIS_REST_URL: "https://mock.upstash.io"
+          UPSTASH_REDIS_REST_TOKEN: "mock-token"

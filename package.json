@@ -2,6 +2,13 @@
   "name": "vaultx",
   "version": "0.1.0",
   "private": true,
+  "description": "AI-first, zero-infrastructure-cost cybersecurity and code intelligence platform.",
+  "author": "Tanay",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/its-tanay003/VAULTX.git"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
