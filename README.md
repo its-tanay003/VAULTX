@@ -2,7 +2,7 @@
 
 An AI-first, zero-infrastructure-cost cybersecurity and code intelligence platform. VAULTX unifies bug bounty programs, Vulnerability Disclosure Programs (VDP), penetration testing (PTaaS), code quality scanning, Web3 smart contract auditing, autonomous AI Red Teaming, Capture The Flag (CTF) competitions, and Code4rena-Style Audit Contests into a single dashboard. 
 
-Built with Next.js 14 App Router, Supabase (PostgreSQL with RLS), Cloudflare Pages, Upstash Redis, Resend, and a resilient Multi-Provider AI Fallback Engine (Claude Sonnet + Gemini Flash).
+Built with Next.js 16 App Router (Turbopack), React 19, Supabase (PostgreSQL with RLS), Cloudflare Pages, Upstash Redis, Resend, and a resilient Multi-Provider AI Fallback Engine (Claude Sonnet + Gemini Flash).
 
 ---
 
@@ -52,7 +52,7 @@ npm install
      npx supabase login
      npx supabase db push --db-url postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT.supabase.co:5432/postgres
      ```
-   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `022_vault_agent_consent.sql` sequentially inside the Supabase SQL Editor.
+   - *Option B (Direct Panel)*: Paste migrations `001_initial.sql` through `027_org_model_audit.sql` sequentially inside the Supabase SQL Editor.
 
 #### 3. Setup Environment Variables
 Create `.env.local` based on `.env.example`:
@@ -137,7 +137,7 @@ vaultx/
 │   ├── github/                # Repo file client with Solidity filters (Week 12)
 │   └── supabase/              # Supabase Client, Server, and TS Types
 ├── supabase/
-│   └── migrations/            # SQL Schemas (001_initial.sql to 011_audit_contests.sql)
+│   └── migrations/            # SQL Schemas (001_initial.sql to 027_org_model_audit.sql)
 ├── middleware.ts              # Auth protection + role routing
 ├── wrangler.jsonc             # Cloudflare Pages Deployment Configuration
 ├── package.json               # Package Manifest & Scripts
@@ -316,7 +316,7 @@ Design doc: `vault-agent-mode-design.md`. Confirm-before-execute layer — VAULT
 ```mermaid
 sequenceDiagram
     participant R as Researcher / User
-    participant App as Next.js 14 Web App
+    participant App as Next.js 16 Web App
     participant DB as Supabase (Postgres)
     participant AI as AI Engine (Claude / Gemini Fallback)
 
