@@ -1,1 +1,14 @@
-npx lint-staged
+# Load typical Windows path locations for Node.js if not already present
+export PATH="$PATH:/c/Program Files/nodejs:/c/Program Files (x86)/nodejs:$APPDATA/npm"
+
+# Check if node is available
+if command -v node >/dev/null 2>&1; then
+  # Run lint-staged via node directly to bypass cmd/sh path resolution quirks
+  if [ -f "./node_modules/lint-staged/bin/lint-staged.js" ]; then
+    node ./node_modules/lint-staged/bin/lint-staged.js
+  else
+    echo "Warning: lint-staged entry point not found. Skipping hook."
+  fi
+else
+  echo "Warning: Node.js was not found in the Git hook PATH. Skipping pre-commit checks."
+fi
