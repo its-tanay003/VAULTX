@@ -173,3 +173,77 @@ export async function fetchDataForQuery(metric: MetricKey): Promise<string> {
     return `(Could not compute ${metric}: ${err instanceof Error ? err.message : "unknown error"})`;
   }
 }
+
+/**
+ * Proactive upgrade suggestions — wired into the VAULT agent "ask your data" path
+ * introduced in Batch 6.
+ *
+ * Logic:
+ *   1. Reads the org's current plan limits via getOrgLimits() (the same function
+ *      checkEntitlement() uses, so numbers are always consistent).
+ *   2. Queries usage_logs for the current billing month, summing usage per metric.
+ *   3. Any metric at ≥80% of its limit is flagged as "near limit".
+ *   4. Returns a plain-English nudge string (empty string if nothing is near limit)
+ *      that the chat handler inserts into the system-prompt context section so
+ *      VAULT can surface it naturally in its next response.
+ *
+ * This function is SERVER-ONLY and called only from the authenticated API route
+ * that serves the VAULT chat — it never runs in the browser.
+ */
+export async function proactiveUpgradeSuggestion(orgId: string): Promise<string> {
+  const { createClient: createAdminClient } = await import("@supabase/supabase-js");
+  const supabase = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { getOrgLimits } = await import("@/lib/billing/entitlements");
+  const limits = await getOrgLimits(orgId);
+
+  // Current billing period
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const periodEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+  const { data: usageLogs } = await supabase
+    .from("usage_logs")
+    .select("metric, amount")
+    .eq("org_id", orgId)
+    .gte("period_start", periodStart)
+    .lte("period_end", periodEnd);
+
+  // Sum usage per metric
+  const usageTotals: Record<string, number> = {};
+  for (const row of usageLogs ?? []) {
+    usageTotals[row.metric] = (usageTotals[row.metric] ?? 0) + (row.amount as number);
+  }
+
+  // Human-readable labels for the limit keys that map to usage_log metrics
+  const METRIC_LABELS: Record<string, string> = {
+    seats:                        "team seats",
+    active_programs:              "active programs",
+    red_team_runs_monthly:        "AI red team scans",
+    ai_triage_requests_monthly:   "AI triage requests",
+    max_pdf_reports_monthly:      "PDF report exports",
+    ptaas_concurrent_engagements: "concurrent PTaaS engagements",
+    private_repos_scanned:        "private repos scanned",
+  };
+
+  const near: string[] = [];
+  for (const [metric, label] of Object.entries(METRIC_LABELS)) {
+    const limit = limits[metric] ?? 0;
+    const usage = usageTotals[metric] ?? 0;
+    if (limit <= 0) continue; // unlimited or unavailable on this plan
+    const pct = usage / limit;
+    if (pct >= 0.8) {
+      near.push(`${label} (${usage}/${limit} used, ${Math.round(pct * 100)}%)`);
+    }
+  }
+
+  if (near.length === 0) return "";
+  return (
+    `[USAGE ALERT] The following quotas are ≥80% consumed this month: ` +
+    near.join("; ") +
+    `. Consider suggesting an upgrade to the next plan tier or relevant add-ons if the user is approaching these limits.`
+  );
+}
