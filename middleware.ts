@@ -8,6 +8,11 @@ const defaultLocale = "en";
 const intlMiddleware = createMiddleware({
   locales,
   defaultLocale,
+  // Keep URLs clean — locale is detected from Accept-Language / NEXT_LOCALE cookie
+  // and used for translations, but never injected into the URL path.
+  // Without this, next-intl rewrites /pricing → /es/pricing for Spanish browsers,
+  // which 404s because the app has no [locale] route segment.
+  localePrefix: "never",
 });
 
 const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/settings"];
@@ -56,26 +61,14 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Strip locale prefix from pathname for protected/auth route checks
-  // e.g. /en/dashboard -> /dashboard
-  let cleanPath = pathname;
-  for (const locale of locales) {
-    if (pathname === `/${locale}`) {
-      cleanPath = "/";
-      break;
-    }
-    if (pathname.startsWith(`/${locale}/`)) {
-      cleanPath = pathname.substring(locale.length + 1);
-      break;
-    }
-  }
+  // No locale prefix in URLs (localePrefix: 'never'), so cleanPath === pathname
+  const cleanPath = pathname;
 
   // Redirect unauthenticated users away from protected routes
   const isProtected = PROTECTED_PREFIXES.some((p) => cleanPath.startsWith(p));
   if (isProtected && !user) {
     const loginUrl = request.nextUrl.clone();
-    const currentLocale = request.cookies.get("NEXT_LOCALE")?.value || defaultLocale;
-    loginUrl.pathname = `/${currentLocale}/login`;
+    loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", cleanPath);
     return NextResponse.redirect(loginUrl);
   }
@@ -84,8 +77,7 @@ export async function middleware(request: NextRequest) {
   const isAuthOnly = AUTH_ONLY_PATHS.some((p) => cleanPath.startsWith(p));
   if (isAuthOnly && user) {
     const homeUrl = request.nextUrl.clone();
-    const currentLocale = request.cookies.get("NEXT_LOCALE")?.value || defaultLocale;
-    homeUrl.pathname = `/${currentLocale}/dashboard`;
+    homeUrl.pathname = "/dashboard";
     return NextResponse.redirect(homeUrl);
   }
 
@@ -97,11 +89,9 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    const currentLocale = request.cookies.get("NEXT_LOCALE")?.value || defaultLocale;
-
     if (profile && !profile.is_onboarded) {
       const onboardUrl = request.nextUrl.clone();
-      onboardUrl.pathname = `/${currentLocale}/onboarding`;
+      onboardUrl.pathname = "/onboarding";
       return NextResponse.redirect(onboardUrl);
     }
 
@@ -122,7 +112,7 @@ export async function middleware(request: NextRequest) {
       if (orgSettings?.require_mfa) {
         const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
         if (aal?.currentLevel !== "aal2") {
-          return NextResponse.redirect(new URL(`/${currentLocale}/auth/mfa-challenge`, request.url));
+          return NextResponse.redirect(new URL("/auth/mfa-challenge", request.url));
         }
       }
     }
@@ -132,8 +122,8 @@ export async function middleware(request: NextRequest) {
       const roleUrl = request.nextUrl.clone();
       roleUrl.pathname =
         profile.role === "org" || profile.role === "triager"
-          ? `/${currentLocale}/dashboard/org`
-          : `/${currentLocale}/dashboard/researcher`;
+          ? "/dashboard/org"
+          : "/dashboard/researcher";
       return NextResponse.redirect(roleUrl);
     }
   }
