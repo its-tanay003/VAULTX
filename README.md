@@ -98,6 +98,8 @@ Organizations can run time-boxed audit contests with crowdsourced researchers:
 | `RESEND_API_KEY` | Email provider API key | `re_xxxxxxxxxxxx` |
 | `UPSTASH_REDIS_REST_URL` | Redis URL for rate limiting & cache | `https://your-database-id.upstash.io` |
 | `UPSTASH_REDIS_REST_TOKEN` | Redis authentication token | `upstash_redis_token_placeholder...` |
+| `STRIPE_SECRET_KEY` | Stripe secret API key | `sk_test_xxxxxxxxxxxx` |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret key | `whsec_xxxxxxxxxxxx` |
 
 ---
 
