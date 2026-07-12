@@ -1,19 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
-import createMiddleware from "next-intl/middleware";
-
-const locales = ["en", "es"];
-const defaultLocale = "en";
-
-const intlMiddleware = createMiddleware({
-  locales,
-  defaultLocale,
-  // Keep URLs clean — locale is detected from Accept-Language / NEXT_LOCALE cookie
-  // and used for translations, but never injected into the URL path.
-  // Without this, next-intl rewrites /pricing → /es/pricing for Spanish browsers,
-  // which 404s because the app has no [locale] route segment.
-  localePrefix: "never",
-});
 
 const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/settings"];
 const AUTH_ONLY_PATHS = ["/login", "/signup"];
@@ -30,8 +16,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 1. Run next-intl middleware to handle localization routing
-  const response = intlMiddleware(request);
+  // 1. Initialize next response (bypass next-intl's URL rewriting middleware)
+  const response = NextResponse.next();
 
   // 2. Perform Supabase Session Refresh and Protected Route Check
   let supabaseResponse = response;
@@ -126,6 +112,13 @@ export async function proxy(request: NextRequest) {
           : "/dashboard/researcher";
       return NextResponse.redirect(roleUrl);
     }
+  }
+
+  // Set NEXT_LOCALE cookie if it is not present in the request and not already set in the response
+  if (!request.cookies.has("NEXT_LOCALE") && !supabaseResponse.cookies.get("NEXT_LOCALE")) {
+    const acceptLang = request.headers.get("accept-language") || "";
+    const currentLocale = acceptLang.toLowerCase().startsWith("es") ? "es" : "en";
+    supabaseResponse.cookies.set("NEXT_LOCALE", currentLocale, { path: "/" });
   }
 
   return supabaseResponse;
