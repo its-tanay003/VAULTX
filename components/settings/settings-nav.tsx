@@ -3,7 +3,7 @@
 import Link      from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  User, Lock, Bell, Eye, Plug, Key, Building2, AlertTriangle,
+  User, Lock, Bell, Eye, Plug, Key, Building2, AlertTriangle, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/settings/integrations",  icon: Plug,          label: "Integrations",  orgOnly: false },
   { href: "/dashboard/settings/api-keys",      icon: Key,           label: "API Keys",      orgOnly: false },
   { href: "/dashboard/settings/organization",  icon: Building2,     label: "Organization",  orgOnly: true  },
+  { href: "/dashboard/org/billing",            icon: CreditCard,    label: "Billing & Usage",orgOnly: true  },
   { href: "/dashboard/settings/danger",        icon: AlertTriangle, label: "Danger Zone",   orgOnly: false },
 ];
 

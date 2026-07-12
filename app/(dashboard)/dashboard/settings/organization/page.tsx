@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
+import Link from "next/link";
 import { toast }                from "sonner";
 import { Loader2, Save, UserMinus, UserPlus, Mail, Shield, Globe, Building2, Webhook } from "lucide-react";
 import { updateOrgProfile, updateOrgSettings, inviteTeamMember, removeTeamMember } from "@/app/actions/settings";
@@ -88,7 +89,7 @@ export default function OrganizationSettingsPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [router, supabase]);
 
   function handleSaveProfile() {
     if (!orgId) return;
@@ -329,17 +330,16 @@ export default function OrganizationSettingsPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">Starter Plan</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-vault-teal/10 border border-vault-teal/20 text-vault-teal">Active</span>
+              <span className="text-sm font-semibold capitalize">{orgName || "Free"} Plan</span>
             </div>
-            <p className="text-xs text-vault-muted mt-1">1 / 5 seats used</p>
+            <p className="text-xs text-vault-muted mt-1">Manage plans, view invoices, and track resource limits</p>
           </div>
-          <a
-            href="mailto:sales@vaultx.io"
+          <Link
+            href="/dashboard/org/billing"
             className="px-3 py-1.5 text-xs rounded-lg border border-vault-border hover:bg-vault-elevated/50 transition-colors"
           >
-            Upgrade → Enterprise
-          </a>
+            Manage Billing & Usage →
+          </Link>
         </div>
       </SectionCard>
     </div>
