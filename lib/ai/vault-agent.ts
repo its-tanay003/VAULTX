@@ -150,6 +150,9 @@ const METRIC_KEYWORDS: Record<MetricKey, string[]> = {
   researcher_leaderboard: ["leaderboard", "ranking", "who found the most"],
   program_roi:            ["roi", "cost per", "value"],
   sla_compliance:         ["sla", "breach", "compliance"],
+  mrr:                    ["mrr", "revenue", "monthly revenue", "collected revenue", "subscription revenue"],
+  churn_rate:             ["churn", "churn rate", "cancellations", "lost subscribers"],
+  conversion_rate:        ["conversion", "conversion rate", "free to paid", "upgrades"],
 };
 
 /** Lightweight keyword-based intent match — cheap, explainable, no extra AI call needed just to route. */

@@ -8,6 +8,7 @@ import {
   metricBugsSubmitted, metricBugsResolved, metricSeverityDistribution,
   metricPayoutTotals, metricAvgResponseTime, metricResearcherActivity,
   metricResearcherLeaderboard, metricProgramRoi, metricSlaCompliance,
+  metricMRR, metricChurnRate, metricConversionRate,
   type ReportFilters,
 } from "@/lib/reports/metrics";
 import { detectAnomalies } from "@/lib/reports/anomaly";
@@ -15,7 +16,8 @@ import { detectAnomalies } from "@/lib/reports/anomaly";
 export type MetricKey =
   | "bugs_submitted" | "bugs_resolved" | "severity_distribution" | "payout_totals"
   | "avg_response_time" | "researcher_activity" | "researcher_leaderboard"
-  | "program_roi" | "sla_compliance";
+  | "program_roi" | "sla_compliance"
+  | "mrr" | "churn_rate" | "conversion_rate";
 
 export interface ReportConfig {
   metrics:        MetricKey[];
@@ -57,6 +59,9 @@ export async function computeReport(config: ReportConfig, filtersOverride?: Omit
       case "researcher_leaderboard": results[metric] = await metricResearcherLeaderboard(filters); break;
       case "program_roi":            results[metric] = await metricProgramRoi(filters); break;
       case "sla_compliance":         results[metric] = await metricSlaCompliance(filters); break;
+      case "mrr":                    results[metric] = await metricMRR(filters); break;
+      case "churn_rate":             results[metric] = await metricChurnRate(filters); break;
+      case "conversion_rate":        results[metric] = await metricConversionRate(filters); break;
     }
   }
 

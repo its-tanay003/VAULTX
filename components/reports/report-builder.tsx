@@ -16,7 +16,7 @@ import {
 import { createSchedule } from "@/app/actions/scheduled-reports";
 import { exportMetricAsCsv, exportChartAsPng } from "@/lib/reports/export";
 
-const METRIC_OPTIONS: { key: MetricKey; label: string; kind: "series" | "table" | "single" }[] = [
+const METRIC_OPTIONS: { key: MetricKey; label: string; kind: "series" | "table" | "single"; group?: string }[] = [
   { key: "bugs_submitted",         label: "Bugs Submitted",        kind: "series" },
   { key: "bugs_resolved",          label: "Bugs Resolved",         kind: "series" },
   { key: "severity_distribution",  label: "Severity Distribution", kind: "series" },
@@ -26,6 +26,10 @@ const METRIC_OPTIONS: { key: MetricKey; label: string; kind: "series" | "table" 
   { key: "researcher_leaderboard", label: "Researcher Leaderboard",kind: "table" },
   { key: "program_roi",            label: "Program Cost/Finding",  kind: "series" },
   { key: "sla_compliance",         label: "SLA Compliance",        kind: "table" },
+  // ─── Billing / SaaS ──────────────────────────────────────────────────────
+  { key: "mrr",             label: "Revenue Collected (USD)", kind: "series", group: "Billing" },
+  { key: "churn_rate",      label: "Churn Rate (%)",           kind: "series", group: "Billing" },
+  { key: "conversion_rate", label: "Conversion Rate (%)",      kind: "series", group: "Billing" },
 ];
 
 const DATE_PRESETS = [
@@ -249,11 +253,21 @@ export function ReportBuilder({ programs, researchers, initialTemplates }: Props
           <button onClick={() => setMetrics(["sla_compliance"])} className="btn-ghost w-full text-xs justify-start">
             SLA Compliance
           </button>
+          <button onClick={() => { setMetrics(["mrr", "churn_rate", "conversion_rate"]); setChartType("line"); }} className="btn-ghost w-full text-xs justify-start">
+            Billing Overview
+          </button>
         </div>
 
         <div className="vault-card p-4 space-y-3">
           <p className="text-xs font-medium text-vault-muted uppercase tracking-wide">Metrics</p>
-          {METRIC_OPTIONS.map((m) => (
+          {METRIC_OPTIONS.filter((m) => !m.group).map((m) => (
+            <label key={m.key} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={metrics.includes(m.key)} onChange={() => toggleMetric(m.key)} className="accent-teal-500" />
+              {m.label}
+            </label>
+          ))}
+          <p className="text-xs font-medium text-vault-muted uppercase tracking-wide pt-1 border-t border-vault-border">Billing</p>
+          {METRIC_OPTIONS.filter((m) => m.group === "Billing").map((m) => (
             <label key={m.key} className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={metrics.includes(m.key)} onChange={() => toggleMetric(m.key)} className="accent-teal-500" />
               {m.label}

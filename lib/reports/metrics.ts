@@ -201,3 +201,134 @@ export async function metricSlaCompliance(f: ReportFilters, client?: any): Promi
     return { submissionId: s.id, title: s.title, program: program?.name ?? "", slaHours, actualHours, breached: actualHours > slaHours };
   });
 }
+
+// ─── Billing / SaaS Metrics ────────────────────────────────────────────────
+// These use the subscriptions + invoices tables written by Batch 1/2.
+// They share the identical (f, client?) signature so they slot into the
+// reporting builder and scheduled-report cron with zero extra plumbing.
+
+/**
+ * Monthly Recurring Revenue (MRR) — per calendar month.
+ *
+ * Source: invoices where status = 'paid', grouped by period_start month.
+ * Amount is the raw amount_cents stored by the webhook ÷ 100, expressed
+ * in the organisation's default currency (assumed USD).  If you later
+ * add multi-currency support, filter or convert here.
+ *
+ * Honest scope note: this is *revenue collected*, not an ARR-normalised
+ * figure.  A yearly subscriber whose annual invoice lands in January
+ * inflates that month by 12× — convert to monthly if you want true MRR.
+ * Labelled "Revenue Collected (USD)" in the UI to avoid overclaiming.
+ */
+export async function metricMRR(f: ReportFilters, client?: any): Promise<{ label: string; value: number }[]> {
+  const supabase = client || createClient();
+  let q = supabase
+    .from("invoices")
+    .select("amount_cents, period_start")
+    .eq("org_id", f.orgId)
+    .eq("status", "paid");
+  if (f.dateFrom) q = q.gte("period_start", f.dateFrom);
+  if (f.dateTo)   q = q.lte("period_start", f.dateTo);
+  const { data } = await q;
+
+  const byMonth = new Map<string, number>();
+  for (const inv of data ?? []) {
+    if (!inv.period_start) continue;
+    const month = (inv.period_start as string).slice(0, 7);
+    byMonth.set(month, (byMonth.get(month) ?? 0) + (inv.amount_cents as number) / 100);
+  }
+  return Array.from(byMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, value]) => ({ label, value: Math.round(value * 100) / 100 }));
+}
+
+/**
+ * Churn Rate — percentage of subscriptions that moved to canceled/unpaid
+ * per calendar month, relative to the total active at the start of the month.
+ *
+ * Approximation: we count rows in subscriptions where updated_at falls in
+ * the month AND status is canceled/unpaid as churned, and the total count
+ * of subscriptions created on or before the month start as the base.
+ * Returns { label: "YYYY-MM", value: churn% } per month.
+ */
+export async function metricChurnRate(f: ReportFilters, client?: any): Promise<{ label: string; value: number }[]> {
+  const supabase = client || createClient();
+  // All subscriptions for this org — no date filter, we need full history
+  const { data: allSubs } = await supabase
+    .from("subscriptions")
+    .select("status, created_at, updated_at")
+    .eq("org_id", f.orgId);
+
+  if (!allSubs?.length) return [];
+
+  // Build a sorted list of months within the requested window
+  const from = f.dateFrom ? f.dateFrom.slice(0, 7) : allSubs
+    .map((s: any) => (s.created_at as string).slice(0, 7))
+    .sort()[0];
+  const to = f.dateTo ? f.dateTo.slice(0, 7) : new Date().toISOString().slice(0, 7);
+
+  const months: string[] = [];
+  let cur = from;
+  while (cur <= to) {
+    months.push(cur);
+    const [y, m] = cur.split("-").map(Number);
+    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+    cur = next;
+  }
+
+  return months.map((month) => {
+    const monthEnd = `${month}-31`; // generous upper bound; string compare is safe
+    const activeAtStart = (allSubs as any[]).filter((s) => (s.created_at as string).slice(0, 7) <= month).length;
+    const churned = (allSubs as any[]).filter((s) =>
+      ["canceled", "unpaid"].includes(s.status) &&
+      (s.updated_at as string).slice(0, 7) === month
+    ).length;
+    const rate = activeAtStart > 0 ? Math.round((churned / activeAtStart) * 1000) / 10 : 0;
+    return { label: month, value: rate };
+  });
+}
+
+/**
+ * Conversion Rate — percentage of signups (profiles.created_at) that
+ * ended up with at least one paid subscription, bucketed by signup month.
+ *
+ * Useful for tracking how well the free-to-paid funnel is working over time.
+ * Returns { label: "YYYY-MM", value: conversion% } per month.
+ *
+ * Scope note: "org" profiles only (role = 'org').  Researcher signups are
+ * excluded — they don't have a billing relationship.
+ */
+export async function metricConversionRate(f: ReportFilters, client?: any): Promise<{ label: string; value: number }[]> {
+  const supabase = client || createClient();
+
+  // All org-role profiles
+  let pq = supabase.from("profiles").select("id, created_at, org_id").eq("role", "org");
+  if (f.dateFrom) pq = pq.gte("created_at", f.dateFrom);
+  if (f.dateTo)   pq = pq.lte("created_at", f.dateTo);
+  const { data: orgProfiles } = await pq;
+
+  if (!orgProfiles?.length) return [];
+
+  // All orgs with at least one active/paid subscription
+  const { data: paidSubs } = await supabase
+    .from("subscriptions")
+    .select("org_id")
+    .in("status", ["active", "trialing"]);
+  const paidOrgIds = new Set((paidSubs ?? []).map((s: any) => s.org_id as string));
+
+  const byMonth = new Map<string, { total: number; converted: number }>();
+  for (const p of orgProfiles as any[]) {
+    const month = (p.created_at as string).slice(0, 7);
+    const entry = byMonth.get(month) ?? { total: 0, converted: 0 };
+    entry.total++;
+    if (p.org_id && paidOrgIds.has(p.org_id as string)) entry.converted++;
+    byMonth.set(month, entry);
+  }
+
+  return Array.from(byMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, { total, converted }]) => ({
+      label,
+      value: total > 0 ? Math.round((converted / total) * 1000) / 10 : 0,
+    }));
+}
