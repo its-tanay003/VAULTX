@@ -18,7 +18,7 @@ const intlMiddleware = createMiddleware({
 const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/settings"];
 const AUTH_ONLY_PATHS = ["/login", "/signup"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Exclude static assets/internal routes from middleware
