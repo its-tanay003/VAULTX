@@ -88,17 +88,34 @@ export async function POST(request: NextRequest) {
           current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
           current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
           cancel_at_period_end: sub.cancel_at_period_end,
+          payment_failed_at: null,
           updated_at: new Date().toISOString(),
         }, { onConflict: "stripe_subscription_id" });
 
         // Update org tier
-        await supabaseAdmin
+        const { data: org } = await supabaseAdmin
           .from("organizations")
           .update({
             subscription_tier: plan.name.toLowerCase().replace(/\s+/g, "_"),
             stripe_customer_id: session.customer as string,
           })
-          .eq("id", orgId);
+          .eq("id", orgId)
+          .select("name, owner_id")
+          .single();
+
+        // Send Upgrade Confirmation Email
+        if (org) {
+          const { data: owner } = await supabaseAdmin.from("profiles").select("email").eq("id", org.owner_id).single();
+          if (owner?.email) {
+            const { upgradeConfirmationEmail } = await import("@/lib/email/templates/billing");
+            const { sendEmail } = await import("@/lib/email/resend");
+            await sendEmail({
+              to: owner.email,
+              subject: `[VAULTX] Upgrade confirmed — ${plan.name} Plan`,
+              html: upgradeConfirmationEmail({ orgName: org.name, planName: plan.name }),
+            });
+          }
+        }
 
         break;
       }
@@ -131,16 +148,33 @@ export async function POST(request: NextRequest) {
           current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
           current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
           cancel_at_period_end: sub.cancel_at_period_end,
+          payment_failed_at: sub.status === "past_due" ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         }).eq("stripe_subscription_id", sub.id);
 
         // Keep organization subscription tier name in sync
-        await supabaseAdmin
+        const { data: org } = await supabaseAdmin
           .from("organizations")
           .update({
             subscription_tier: plan.name.toLowerCase().replace(/\s+/g, "_"),
           })
-          .eq("id", orgId);
+          .eq("id", orgId)
+          .select("name, owner_id")
+          .single();
+
+        // Handle cancellations notifications
+        if (sub.cancel_at_period_end && org) {
+          const { data: owner } = await supabaseAdmin.from("profiles").select("email").eq("id", org.owner_id).single();
+          if (owner?.email) {
+            const { cancellationConfirmationEmail } = await import("@/lib/email/templates/billing");
+            const { sendEmail } = await import("@/lib/email/resend");
+            await sendEmail({
+              to: owner.email,
+              subject: `[VAULTX] Subscription cancellation confirmed`,
+              html: cancellationConfirmationEmail({ orgName: org.name, planName: plan.name }),
+            });
+          }
+        }
 
         break;
       }
@@ -160,12 +194,27 @@ export async function POST(request: NextRequest) {
         }).eq("stripe_subscription_id", sub.id);
 
         // Downgrade organization back to free tier
-        await supabaseAdmin
+        const { data: org } = await supabaseAdmin
           .from("organizations")
           .update({
             subscription_tier: "free",
           })
-          .eq("id", orgId);
+          .eq("id", orgId)
+          .select("name, owner_id")
+          .single();
+
+        if (org) {
+          const { data: owner } = await supabaseAdmin.from("profiles").select("email").eq("id", org.owner_id).single();
+          if (owner?.email) {
+            const { downgradedNoticeEmail } = await import("@/lib/email/templates/billing");
+            const { sendEmail } = await import("@/lib/email/resend");
+            await sendEmail({
+              to: owner.email,
+              subject: `[VAULTX] Organization downgraded to Free tier`,
+              html: downgradedNoticeEmail({ orgName: org.name }),
+            });
+          }
+        }
 
         break;
       }
@@ -184,6 +233,13 @@ export async function POST(request: NextRequest) {
             period_start: new Date(invoice.period_start * 1000).toISOString(),
             period_end: new Date(invoice.period_end * 1000).toISOString(),
           });
+
+          // Paid successfully → reset grace period
+          if (invoice.subscription) {
+            await supabaseAdmin.from("subscriptions").update({
+              payment_failed_at: null,
+            }).eq("stripe_subscription_id", invoice.subscription as string);
+          }
         }
         break;
       }
@@ -191,10 +247,30 @@ export async function POST(request: NextRequest) {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         if (invoice.subscription) {
+          const nowStr = new Date().toISOString();
           await supabaseAdmin.from("subscriptions").update({
             status: "past_due",
-            updated_at: new Date().toISOString(),
+            payment_failed_at: nowStr,
+            updated_at: nowStr,
           }).eq("stripe_subscription_id", invoice.subscription as string);
+
+          const sub = await stripe.subscriptions.retrieve(invoice.subscription as string);
+          const orgId = sub.metadata?.org_id;
+          if (orgId) {
+            const { data: org } = await supabaseAdmin.from("organizations").select("name, owner_id").eq("id", orgId).single();
+            if (org) {
+              const { data: owner } = await supabaseAdmin.from("profiles").select("email").eq("id", org.owner_id).single();
+              if (owner?.email) {
+                const { paymentFailedEmail } = await import("@/lib/email/templates/billing");
+                const { sendEmail } = await import("@/lib/email/resend");
+                await sendEmail({
+                  to: owner.email,
+                  subject: `[VAULTX] Payment failed for organization ${org.name}`,
+                  html: paymentFailedEmail({ orgName: org.name }),
+                });
+              }
+            }
+          }
         }
         break;
       }

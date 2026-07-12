@@ -1,0 +1,31 @@
+name: Billing Grace Period Check
+
+# Runs daily at 08:00 UTC to enforce the 7-day grace period logic
+# on unpaid/past_due subscriptions. Free on GitHub Actions.
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  check-grace-period:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger billing grace period evaluation
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X GET \
+            "${{ secrets.VAULT_APP_URL }}/api/cron/billing-grace-period" \
+            -H "x-vault-secret: ${{ secrets.VAULT_INTERNAL_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "Response: $body"
+          echo "HTTP status: $http_code"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::Billing grace period evaluation failed with status $http_code"
+            exit 1
+          fi

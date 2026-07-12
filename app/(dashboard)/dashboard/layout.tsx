@@ -7,6 +7,7 @@ import { CommandPaletteProvider }  from "@/components/providers/command-palette-
 import { SkipToContent }           from "@/components/ui/skip-to-content";
 import { VaultContextProvider } from "@/components/vault/vault-context";
 import { VaultWidgetWrapper } from "@/components/vault/vault-widget-wrapper";
+import { BillingBanner } from "@/components/billing/billing-banner";
 
 /**
  * UPDATED Week 7 (final):
@@ -34,6 +35,7 @@ export default async function DashboardLayout({
   return (
     <CommandPaletteProvider role={profile.role}>
       <VaultContextProvider>
+        <BillingBanner />
         <SkipToContent />
         <div className="flex h-screen bg-vault-bg overflow-hidden">
           <Sidebar
