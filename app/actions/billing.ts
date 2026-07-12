@@ -55,93 +55,103 @@ export async function startCheckout(
   planId: string,
   billingCycle: "monthly" | "yearly"
 ): Promise<string> {
-  const supabase = createClient();
-  const { user, org } = await assertOrgOwnerAccess(supabase);
+  try {
+    const supabase = createClient();
+    const { user, org } = await assertOrgOwnerAccess(supabase);
 
-  // Retrieve plan details
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("*")
-    .eq("id", planId)
-    .single();
+    // Retrieve plan details
+    const { data: plan } = await supabase
+      .from("plans")
+      .select("*")
+      .eq("id", planId)
+      .single();
 
-  if (!plan) {
-    throw new Error("Plan not found");
-  }
-
-  const priceId =
-    billingCycle === "monthly"
-      ? plan.stripe_price_id_monthly
-      : plan.stripe_price_id_yearly;
-
-  if (!priceId) {
-    throw new Error(`Plan has no active price configured for cycle: ${billingCycle}`);
-  }
-
-  // Get or Create Stripe Customer
-  let stripeCustomerId = org.stripe_customer_id;
-  if (!stripeCustomerId) {
-    stripeCustomerId = await createOrGetStripeCustomer({
-      orgId: org.id,
-      name: org.name,
-      email: user.email || "",
-    });
-
-    // Save Customer ID back to the organization
-    const { error: updateError } = await supabase
-      .from("organizations")
-      .update({ stripe_customer_id: stripeCustomerId })
-      .eq("id", org.id);
-
-    if (updateError) {
-      throw new Error(`Failed to save Stripe customer details: ${updateError.message}`);
+    if (!plan) {
+      throw new Error("Plan not found");
     }
+
+    const priceId =
+      billingCycle === "monthly"
+        ? plan.stripe_price_id_monthly
+        : plan.stripe_price_id_yearly;
+
+    if (!priceId) {
+      throw new Error(`Plan has no active price configured for cycle: ${billingCycle}`);
+    }
+
+    // Get or Create Stripe Customer
+    let stripeCustomerId = org.stripe_customer_id;
+    if (!stripeCustomerId) {
+      stripeCustomerId = await createOrGetStripeCustomer({
+        orgId: org.id,
+        name: org.name,
+        email: user.email || "",
+      });
+
+      // Save Customer ID back to the organization
+      const { error: updateError } = await supabase
+        .from("organizations")
+        .update({ stripe_customer_id: stripeCustomerId })
+        .eq("id", org.id);
+
+      if (updateError) {
+        throw new Error(`Failed to save Stripe customer details: ${updateError.message}`);
+      }
+    }
+
+    // Configure return redirect paths
+    const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const successUrl = `${origin}/api/billing/checkout-return?status=success`;
+    const cancelUrl = `${origin}/api/billing/checkout-return?status=cancel`;
+
+    return await createCheckoutSession({
+      stripeCustomerId,
+      priceId,
+      successUrl,
+      cancelUrl,
+      orgId: org.id,
+    });
+  } catch (error: any) {
+    console.error("startCheckout failed:", error);
+    throw new Error(error.message || "Failed to initiate Stripe checkout");
   }
-
-  // Configure return redirect paths
-  const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const successUrl = `${origin}/api/billing/checkout-return?status=success`;
-  const cancelUrl = `${origin}/api/billing/checkout-return?status=cancel`;
-
-  return await createCheckoutSession({
-    stripeCustomerId,
-    priceId,
-    successUrl,
-    cancelUrl,
-    orgId: org.id,
-  });
 }
 
 /**
  * Generates a self-serve Stripe customer portal link for plan changes/cancellation.
  */
 export async function openBillingPortal(): Promise<string> {
-  const supabase = createClient();
-  const { user, org } = await assertOrgOwnerAccess(supabase);
+  try {
+    const supabase = createClient();
+    const { user, org } = await assertOrgOwnerAccess(supabase);
 
-  let stripeCustomerId = org.stripe_customer_id;
-  if (!stripeCustomerId) {
-    stripeCustomerId = await createOrGetStripeCustomer({
-      orgId: org.id,
-      name: org.name,
-      email: user.email || "",
-    });
+    let stripeCustomerId = org.stripe_customer_id;
+    if (!stripeCustomerId) {
+      stripeCustomerId = await createOrGetStripeCustomer({
+        orgId: org.id,
+        name: org.name,
+        email: user.email || "",
+      });
 
-    const { error: updateError } = await supabase
-      .from("organizations")
-      .update({ stripe_customer_id: stripeCustomerId })
-      .eq("id", org.id);
+      const { error: updateError } = await supabase
+        .from("organizations")
+        .update({ stripe_customer_id: stripeCustomerId })
+        .eq("id", org.id);
 
-    if (updateError) {
-      throw new Error(`Failed to save Stripe customer details: ${updateError.message}`);
+      if (updateError) {
+        throw new Error(`Failed to save Stripe customer details: ${updateError.message}`);
+      }
     }
+
+    const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const returnUrl = `${origin}/dashboard/settings/organization`;
+
+    return await createBillingPortalSession({
+      stripeCustomerId,
+      returnUrl,
+    });
+  } catch (error: any) {
+    console.error("openBillingPortal failed:", error);
+    throw new Error(error.message || "Failed to open Stripe billing portal");
   }
-
-  const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const returnUrl = `${origin}/dashboard/settings/organization`;
-
-  return await createBillingPortalSession({
-    stripeCustomerId,
-    returnUrl,
-  });
 }
