@@ -29,7 +29,7 @@ const nextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' blob: data: https://avatars.githubusercontent.com https://lh3.googleusercontent.com https://*.supabase.co; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.stripe.com https://*.supabase.co; frame-src 'self' https://js.stripe.com;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' blob: data: https://avatars.githubusercontent.com https://lh3.googleusercontent.com https://*.supabase.co; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.stripe.com https://*.supabase.co wss://*.supabase.co; frame-src 'self' https://js.stripe.com;",
           },
         ],
       },
