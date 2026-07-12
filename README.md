@@ -53,6 +53,36 @@ Inside Supabase Console → Authentication → Providers, enable **Email Magic l
 npm run dev
 ```
 
+### 6. Running Tests
+
+```bash
+npm run test
+```
+
+---
+
+## 📖 Usage Guide
+
+### 1. Account Onboarding & Roles
+When logging in for the first time, you will be prompted to choose a role:
+- **Organization**: Build bounty programs, configure scopes, schedule pentests, and triage vulnerabilities.
+- **Researcher**: Submit vulnerability reports, check static repository code quality, and participate in CTF/Audit contests.
+
+### 2. Interacting with VAULT (AI Assistant)
+VAULT is a context-aware security assistant available globally in the bottom-right corner of the dashboard:
+1. Navigate to **Settings** → **Privacy** and toggle **Enable AI Assistant**.
+2. Tap the floating avatar to open the chat widget.
+3. VAULT dynamically registers context (e.g., the specific vulnerability report or repository you are viewing).
+4. Request VAULT to perform actions (e.g., *"trigger static code scan"* or *"generate PTaaS executive report"*). VAULT will draft a secure action proposal card requiring your explicit authorization before execution.
+
+### 3. Running Code4rena-Style Audit Contests
+Organizations can run time-boxed audit contests with crowdsourced researchers:
+1. Navigate to **Contests** in the dashboard and click **New Contest**.
+2. Input the Github repository scope, dates, and the upfront committed USDC reward pool.
+3. Once active, researchers submit individual findings referencing specific line ranges.
+4. During the judging phase, VAULT's duplicate grouper semantically gathers duplicate bugs to accelerate triaging.
+5. Payouts are auto-calculated using the Code4rena share distribution formula (`shares = severity_weight / duplicate_count`).
+
 ---
 
 ## ⚙️ Configuration & Environment Variables
@@ -77,8 +107,8 @@ VAULTX relies on a serverless-first, edge-optimized architecture deployed to **C
 
 For detailed documents on the product requirements, implementation blueprint, database schemas, and architectural guidelines, refer to the following documents:
 
-* **Architecture & Spec Blueprint**: See [docs/blueprint.md](file:///c:/New%20Volume%20(D)/vaultx/docs/blueprint.md)
-* **Code of Conduct**: See [CODE_OF_CONDUCT.md](file:///c:/New%20Volume%20(D)/vaultx/CODE_OF_CONDUCT.md)
-* **Contributing Guidelines**: See [CONTRIBUTING.md](file:///c:/New%20Volume%20(D)/vaultx/CONTRIBUTING.md)
-* **Security Policy**: See [SECURITY.md](file:///c:/New%20Volume%20(D)/vaultx/SECURITY.md)
-* **License**: See [LICENSE](file:///c:/New%20Volume%20(D)/vaultx/LICENSE) (MIT License)
+- **Architecture & Spec Blueprint**: See [docs/blueprint.md](file:///c:/New%20Volume%20(D)/vaultx/docs/blueprint.md)
+- **Code of Conduct**: See [CODE_OF_CONDUCT.md](file:///c:/New%20Volume%20(D)/vaultx/CODE_OF_CONDUCT.md)
+- **Contributing Guidelines**: See [CONTRIBUTING.md](file:///c:/New%20Volume%20(D)/vaultx/CONTRIBUTING.md)
+- **Security Policy**: See [SECURITY.md](file:///c:/New%20Volume%20(D)/vaultx/SECURITY.md)
+- **License**: See [LICENSE](file:///c:/New%20Volume%20(D)/vaultx/LICENSE) (MIT License)
