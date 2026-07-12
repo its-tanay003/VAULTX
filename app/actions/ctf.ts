@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect }       from "next/navigation";
 import { createHash }     from "crypto";
 
+import { checkEntitlement } from "@/lib/billing/entitlements";
+
 /* ─── Create competition ──────────────────────────────────────────────────── */
 export async function createCompetition(formData: FormData) {
   const supabase = createClient();
@@ -15,6 +17,18 @@ export async function createCompetition(formData: FormData) {
     .from("profiles").select("org_id, role").eq("id", user.id).single();
   if (profile?.role !== "org" || !profile.org_id) {
     throw new Error("Only organizations can create CTF competitions");
+  }
+
+  // Entitlement Check: Gate active CTF competitions
+  const { count: ctfCount } = await supabase
+    .from("ctf_competitions")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", profile.org_id)
+    .in("status", ["draft", "active"]);
+
+  const { allowed } = await checkEntitlement(profile.org_id, "ctf_active", ctfCount || 0);
+  if (!allowed) {
+    throw new Error("CTF_LIMIT_EXCEEDED: You have reached the active CTF competition limit for your tier. Please upgrade your plan.");
   }
 
   const title       = (formData.get("title") as string)?.trim();

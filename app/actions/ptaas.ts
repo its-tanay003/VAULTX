@@ -6,6 +6,8 @@ import { redirect }       from "next/navigation";
 import { generateTestPlan, generatePentestReport } from "@/lib/ai/pentest";
 import type { SeverityLevel } from "@/lib/supabase/types";
 
+import { checkEntitlement } from "@/lib/billing/entitlements";
+
 /* ─── Create engagement ───────────────────────────────────────────────────── */
 export async function createEngagement(formData: FormData) {
   const supabase = createClient();
@@ -16,6 +18,18 @@ export async function createEngagement(formData: FormData) {
     .from("profiles").select("org_id, role").eq("id", user.id).single();
   if (profile?.role !== "org" || !profile.org_id) {
     throw new Error("Only organizations can create pentest engagements");
+  }
+
+  // Entitlement Check: Gate concurrent PTaaS engagements
+  const { count: concurrentCount } = await supabase
+    .from("pentest_engagements")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", profile.org_id)
+    .in("status", ["scheduled", "in_progress"]);
+
+  const { allowed } = await checkEntitlement(profile.org_id, "ptaas_concurrent_engagements", concurrentCount || 0);
+  if (!allowed) {
+    throw new Error("PTAAS_LIMIT_EXCEEDED: You have reached the active concurrent pentest engagement limit for your tier. Please upgrade your plan.");
   }
 
   const name              = (formData.get("name") as string)?.trim();

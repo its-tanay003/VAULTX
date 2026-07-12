@@ -16,11 +16,15 @@ VALUES
     NULL,
     '{
       "seats": 1,
+      "active_programs": 1,
       "red_team_runs_monthly": 1,
       "audit_contest_submissions": 0,
       "private_repos_scanned": 0,
       "ai_triage_requests_monthly": 5,
-      "max_pdf_reports_monthly": 1
+      "max_pdf_reports_monthly": 1,
+      "ptaas_concurrent_engagements": 0,
+      "ctf_active": 0,
+      "contests_active": 0
     }'::jsonb
   ),
   (
@@ -31,11 +35,15 @@ VALUES
     'price_placeholder_pro_yearly',
     '{
       "seats": 5,
+      "active_programs": 5,
       "red_team_runs_monthly": 10,
       "audit_contest_submissions": 5,
       "private_repos_scanned": 3,
       "ai_triage_requests_monthly": 100,
-      "max_pdf_reports_monthly": 10
+      "max_pdf_reports_monthly": 10,
+      "ptaas_concurrent_engagements": 1,
+      "ctf_active": 1,
+      "contests_active": 1
     }'::jsonb
   ),
   (
@@ -46,11 +54,15 @@ VALUES
     'price_placeholder_max_yearly',
     '{
       "seats": 20,
+      "active_programs": 20,
       "red_team_runs_monthly": 50,
       "audit_contest_submissions": 20,
       "private_repos_scanned": 10,
       "ai_triage_requests_monthly": 500,
-      "max_pdf_reports_monthly": 50
+      "max_pdf_reports_monthly": 50,
+      "ptaas_concurrent_engagements": 5,
+      "ctf_active": 5,
+      "contests_active": 5
     }'::jsonb
   ),
   (
@@ -61,11 +73,15 @@ VALUES
     'price_placeholder_promax_yearly',
     '{
       "seats": 999999,
+      "active_programs": 999999,
       "red_team_runs_monthly": 999999,
       "audit_contest_submissions": 999999,
       "private_repos_scanned": 999999,
       "ai_triage_requests_monthly": 999999,
-      "max_pdf_reports_monthly": 999999
+      "max_pdf_reports_monthly": 999999,
+      "ptaas_concurrent_engagements": 999999,
+      "ctf_active": 999999,
+      "contests_active": 999999
     }'::jsonb
   )
 ON CONFLICT (name) DO UPDATE

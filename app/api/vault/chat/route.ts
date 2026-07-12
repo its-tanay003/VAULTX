@@ -28,15 +28,39 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const { data: profile } = await supabase.from("profiles").select("role, vault_agent_mode_enabled").eq("id", user.id).single();
-  const realRole: UserRole = profile?.role ?? "researcher";
-  const role: "researcher" | "admin" = realRole === "researcher" ? "researcher" : "admin";
-  const agentModeEnabled = profile?.vault_agent_mode_enabled ?? true;
-
   const body = await request.json().catch(() => null);
   const message: string | undefined = body?.message;
   const context: VaultContext = body?.context ?? {};
   let conversationId: string | undefined = body?.conversationId;
+
+  const { data: profile } = await supabase.from("profiles").select("role, org_id, vault_agent_mode_enabled").eq("id", user.id).single();
+  const realRole: UserRole = profile?.role ?? "researcher";
+  const role: "researcher" | "admin" = realRole === "researcher" ? "researcher" : "admin";
+  const orgId = profile?.org_id;
+
+  // 1. Quota Check: enforce monthly AI requests
+  if (orgId) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const { count: monthlyMsgCount } = await supabase
+      .from("vault_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "user")
+      .gte("created_at", startOfMonth);
+
+    const { checkEntitlement } = await import("@/lib/billing/entitlements");
+    const { allowed } = await checkEntitlement(orgId, "ai_triage_requests_monthly", monthlyMsgCount || 0);
+    if (!allowed) {
+      return new Response("AI_LIMIT_EXCEEDED: You have reached the monthly AI request limit for your tier. Please upgrade your plan.", { status: 403 });
+    }
+  }
+
+  // 2. Agent Mode Check: Disable actions for Free tier users (ptaas_concurrent_engagements is 0)
+  const { getOrgLimits } = await import("@/lib/billing/entitlements");
+  const limits = orgId ? await getOrgLimits(orgId) : null;
+  const isAgentAllowed = limits ? limits.ptaas_concurrent_engagements > 0 : false;
+  const agentModeEnabled = (profile?.vault_agent_mode_enabled ?? true) && isAgentAllowed;
 
   if (!message || typeof message !== "string") {
     return new Response("Missing message", { status: 400 });
@@ -145,6 +169,12 @@ export async function POST(request: Request) {
             } catch {
               // Malformed JSON in the action block — same silent drop.
             }
+          }
+
+          // Log Quota Usage after successful completion
+          if (orgId) {
+            const { logUsage } = await import("@/lib/billing/entitlements");
+            await logUsage(orgId, "ai_triage_requests_monthly", 1).catch(console.error);
           }
         }
         controller.close();

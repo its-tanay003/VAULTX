@@ -31,10 +31,24 @@ async function getOrgId(supabase: ReturnType<typeof createClient>): Promise<stri
   return profile.org_id;
 }
 
+import { checkEntitlement } from "@/lib/billing/entitlements";
+
 /* ─── Create program ──────────────────────────────────────────────────────── */
 export async function createProgram(formData: FormData) {
   const supabase = createClient();
   const orgId    = await getOrgId(supabase);
+
+  // Entitlement Check: Gate active program counts
+  const { count: activeCount } = await supabase
+    .from("programs")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("status", "active");
+
+  const { allowed } = await checkEntitlement(orgId, "active_programs", activeCount || 0);
+  if (!allowed) {
+    throw new Error("ACTIVE_PROGRAMS_LIMIT_EXCEEDED: You have reached the active program limit for your tier. Please upgrade your plan to launch more programs.");
+  }
 
   const name       = formData.get("name")       as string;
   const type       = formData.get("type")       as ProgramType;

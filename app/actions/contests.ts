@@ -6,6 +6,8 @@ import { redirect }        from "next/navigation";
 import { calculatePayouts }  from "@/lib/ai/contest-distribution";
 import { suggestDuplicateGroups } from "@/lib/ai/contest-judge";
 
+import { checkEntitlement } from "@/lib/billing/entitlements";
+
 /* ─── Create contest ──────────────────────────────────────────────────────── */
 export async function createContest(formData: FormData) {
   const supabase = createClient();
@@ -15,7 +17,19 @@ export async function createContest(formData: FormData) {
   const { data: profile } = await supabase
     .from("profiles").select("org_id, role").eq("id", user.id).single();
   if (profile?.role !== "org" || !profile.org_id) {
-    throw new Error("Only organizations can create audit contests");
+    throw new Error("Only organizations can host audit contests");
+  }
+
+  // Entitlement Check: Gate active audit contests
+  const { count: contestCount } = await supabase
+    .from("audit_contests")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", profile.org_id)
+    .in("status", ["draft", "open", "judging"]);
+
+  const { allowed } = await checkEntitlement(profile.org_id, "contests_active", contestCount || 0);
+  if (!allowed) {
+    throw new Error("CONTESTS_LIMIT_EXCEEDED: You have reached the active audit contest limit for your tier. Please upgrade your plan.");
   }
 
   const title       = (formData.get("title") as string)?.trim();

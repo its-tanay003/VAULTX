@@ -329,6 +329,18 @@ export async function inviteTeamMember(formData: FormData) {
     throw new Error("Only organization owners can invite members.");
   }
 
+  // Entitlement Check: Gate seats
+  const { count: memberCount } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", profile.org_id);
+
+  const { checkEntitlement } = await import("@/lib/billing/entitlements");
+  const { allowed } = await checkEntitlement(profile.org_id, "seats", memberCount || 0);
+  if (!allowed) {
+    throw new Error("SEATS_LIMIT_EXCEEDED: You have reached the maximum number of team members (seats) allowed for your tier. Please upgrade your plan.");
+  }
+
   // In production: send invite email via Resend. For now, log intent.
   console.info(`[Team Invite] org=${profile.org_id} invited=${email} by=${user.id}`);
 

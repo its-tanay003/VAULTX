@@ -63,6 +63,19 @@ export async function connectRepo(formData: FormData) {
     .from("profiles").select("org_id, role").eq("id", user.id).single();
   const isOrg = ["org", "triager", "admin"].includes(profile?.role ?? "") && profile?.org_id;
 
+  if (isOrg) {
+    const { count: repoCount } = await supabase
+      .from("code_repos")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", profile.org_id);
+
+    const { checkEntitlement } = await import("@/lib/billing/entitlements");
+    const { allowed } = await checkEntitlement(profile.org_id, "private_repos_scanned", repoCount || 0);
+    if (!allowed) {
+      throw new Error("REPOS_LIMIT_EXCEEDED: You have connected the maximum number of repositories allowed for your tier. Please upgrade your plan.");
+    }
+  }
+
   const installationToken = await resolveInstallationToken(isOrg ? profile.org_id : null);
   const meta = await fetchRepoMetadata(parsed.owner, parsed.repo, installationToken);
 
@@ -117,6 +130,35 @@ export async function runScan(repoId: string): Promise<void> {
     .from("code_repos").select("*").eq("id", repoId).single();
   if (!repo) throw new Error("Repo not found");
 
+  // Entitlement Check: Gate monthly scans
+  if (repo.org_id) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    
+    const { data: orgRepos } = await supabase
+      .from("code_repos")
+      .select("id")
+      .eq("org_id", repo.org_id);
+    
+    const repoIds = orgRepos?.map(r => r.id) || [];
+    let monthlyScanCount = 0;
+    if (repoIds.length > 0) {
+      const { count } = await supabase
+        .from("code_scans")
+        .select("id", { count: "exact", head: true })
+        .in("repo_id", repoIds)
+        .eq("status", "complete")
+        .gte("completed_at", startOfMonth);
+      monthlyScanCount = count || 0;
+    }
+
+    const { checkEntitlement } = await import("@/lib/billing/entitlements");
+    const { allowed } = await checkEntitlement(repo.org_id, "ai_triage_requests_monthly", monthlyScanCount);
+    if (!allowed) {
+      throw new Error("AI_LIMIT_EXCEEDED: You have reached the monthly AI scan limit for your tier. Please upgrade your plan.");
+    }
+  }
+
   // Cooldown check: can't rescan the same repo within 5 minutes
   if (repo.last_scanned_at) {
     const elapsed = Date.now() - new Date(repo.last_scanned_at).getTime();
@@ -156,6 +198,12 @@ export async function runScan(repoId: string): Promise<void> {
       .from("code_repos")
       .update({ last_scanned_at: new Date().toISOString() })
       .eq("id", repoId);
+
+    // Log Quota Usage after scan successfully finishes
+    if (repo.org_id) {
+      const { logUsage } = await import("@/lib/billing/entitlements");
+      await logUsage(repo.org_id, "ai_scan", 1);
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Scan failed";
     await supabase
@@ -187,6 +235,35 @@ export async function runWeb3Audit(repoId: string): Promise<void> {
   const { data: repo } = await supabase
     .from("code_repos").select("*").eq("id", repoId).single();
   if (!repo) throw new Error("Repo not found");
+
+  // Entitlement Check: Gate monthly scans
+  if (repo.org_id) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    
+    const { data: orgRepos } = await supabase
+      .from("code_repos")
+      .select("id")
+      .eq("org_id", repo.org_id);
+    
+    const repoIds = orgRepos?.map(r => r.id) || [];
+    let monthlyScanCount = 0;
+    if (repoIds.length > 0) {
+      const { count } = await supabase
+        .from("code_scans")
+        .select("id", { count: "exact", head: true })
+        .in("repo_id", repoIds)
+        .eq("status", "complete")
+        .gte("completed_at", startOfMonth);
+      monthlyScanCount = count || 0;
+    }
+
+    const { checkEntitlement } = await import("@/lib/billing/entitlements");
+    const { allowed } = await checkEntitlement(repo.org_id, "ai_triage_requests_monthly", monthlyScanCount);
+    if (!allowed) {
+      throw new Error("AI_LIMIT_EXCEEDED: You have reached the monthly AI scan limit for your tier. Please upgrade your plan.");
+    }
+  }
 
   // Cooldown check: can't rescan the same repo within 5 minutes
   if (repo.last_scanned_at) {
@@ -242,6 +319,12 @@ export async function runWeb3Audit(repoId: string): Promise<void> {
       .from("code_repos")
       .update({ last_scanned_at: new Date().toISOString() })
       .eq("id", repoId);
+
+    // Log Quota Usage after scan successfully finishes
+    if (repo.org_id) {
+      const { logUsage } = await import("@/lib/billing/entitlements");
+      await logUsage(repo.org_id, "ai_scan", 1);
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Web3 audit failed";
     await supabase

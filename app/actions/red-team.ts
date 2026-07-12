@@ -85,6 +85,35 @@ export async function triggerScan(targetId: string): Promise<{ success: boolean;
       throw new Error("Access denied — you don't own this target");
     }
 
+    // Entitlement Check: Gate monthly red team runs
+    if (target.org_id) {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      
+      const { data: orgTargets } = await supabase
+        .from("red_team_targets")
+        .select("id")
+        .eq("org_id", target.org_id);
+      
+      const targetIds = orgTargets?.map(t => t.id) || [];
+      let monthlyRedTeamCount = 0;
+      if (targetIds.length > 0) {
+        const { count } = await supabase
+          .from("red_team_scans")
+          .select("id", { count: "exact", head: true })
+          .in("target_id", targetIds)
+          .eq("status", "complete")
+          .gte("completed_at", startOfMonth);
+        monthlyRedTeamCount = count || 0;
+      }
+
+      const { checkEntitlement } = await import("@/lib/billing/entitlements");
+      const { allowed } = await checkEntitlement(target.org_id, "red_team_runs_monthly", monthlyRedTeamCount);
+      if (!allowed) {
+        throw new Error("RED_TEAM_LIMIT_EXCEEDED: You have reached the monthly AI Red Team scan limit for your tier. Please upgrade your plan.");
+      }
+    }
+
     // Cooldown check (5 minutes)
     if (target.last_scanned_at) {
       const elapsed = Date.now() - new Date(target.last_scanned_at).getTime();
@@ -100,6 +129,12 @@ export async function triggerScan(targetId: string): Promise<{ success: boolean;
       .from("red_team_targets")
       .update({ last_scanned_at: new Date().toISOString() })
       .eq("id", targetId);
+
+    // Log Quota Usage after scan successfully finishes
+    if (target.org_id) {
+      const { logUsage } = await import("@/lib/billing/entitlements");
+      await logUsage(target.org_id, "red_team_run", 1);
+    }
 
     revalidatePath(`/dashboard/ai-red-team/${targetId}`);
     revalidatePath("/dashboard/ai-red-team");
