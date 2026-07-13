@@ -42,6 +42,25 @@ export async function provisionWorkspace(repoId: string, branch = "main"): Promi
 
   if (!repo) throw new Error("Repository not found");
 
+  let subscriptionTier = "free";
+  if (repo.org_id) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("subscription_tier")
+      .eq("id", repo.org_id)
+      .single();
+    if (org) {
+      subscriptionTier = org.subscription_tier || "free";
+    }
+  }
+
+  // 1800s (30 mins) for Free, 7200s (120 mins) for Pro, 86400s (24 hrs) for Enterprise
+  const timeoutSeconds = subscriptionTier.toLowerCase() === "enterprise"
+    ? 86400
+    : subscriptionTier.toLowerCase() === "pro"
+      ? 7200
+      : 1800;
+
   // Create workspace metadata row
   const { data: workspace, error } = await supabase
     .from("workspaces")
@@ -57,8 +76,17 @@ export async function provisionWorkspace(repoId: string, branch = "main"): Promi
   if (error) throw new Error(error.message);
 
   try {
-    const sandbox = await createSandbox();
+    const sandbox = await createSandbox(timeoutSeconds);
     const sandboxId = sandbox.sandboxId;
+
+    // Apply network egress firewall rules inside the E2B VM
+    if (!sandboxId.startsWith("mock-sandbox-")) {
+      await runCommand(sandboxId, "sudo iptables -P OUTPUT DROP");
+      await runCommand(sandboxId, "sudo iptables -A OUTPUT -o lo -j ACCEPT");
+      await runCommand(sandboxId, "sudo iptables -A OUTPUT -p udp --dport 53 -j ACCEPT");
+      await runCommand(sandboxId, "sudo iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT");
+      await runCommand(sandboxId, "sudo iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT");
+    }
 
     // Clone the repository inside the sandbox environment
     const token = await resolveInstallationToken(repo.org_id);
@@ -255,3 +283,31 @@ export async function commitAndPushWorkspace(workspaceId: string, commitMessage:
     throw new Error(`Git push failed: ${pushRes.stderr || pushRes.stdout}`);
   }
 }
+
+export async function runTerminalCommand(
+  workspaceId: string,
+  cmd: string
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const { supabase } = await getAuthedUser();
+
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .select("*")
+    .eq("id", workspaceId)
+    .single();
+
+  if (!ws || !ws.sandbox_id) throw new Error("Workspace not active");
+
+  // Security check: Block attempts to flush or edit iptables
+  const lower = cmd.toLowerCase().trim();
+  if (lower.startsWith("iptables") || lower.includes(" iptables") || lower.includes("sudo ") || lower.includes("/etc/iptables")) {
+    return {
+      stdout: "",
+      stderr: "Security Policy Exception: Direct privilege escalation (sudo) or firewall configuration (iptables) is prohibited inside developer workspaces.",
+      exitCode: 1,
+    };
+  }
+
+  return runCommand(ws.sandbox_id, cmd);
+}
+

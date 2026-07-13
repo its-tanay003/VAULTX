@@ -6,6 +6,8 @@ import { Folder, File, ChevronRight, ChevronDown, Save, GitCommit, Pause, Trash2
 import { getWorkspaceFiles, getWorkspaceFileContent, saveWorkspaceFile, commitAndPushWorkspace, suspendWorkspace, destroyWorkspace } from "@/app/actions/workspace";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { WorkspaceTerminal } from "./terminal";
+
 
 interface TreeNode {
   name: string;
@@ -289,40 +291,47 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
           </div>
         </div>
 
-        {/* Monaco Editor Container */}
-        <div className="flex-1 min-w-0 bg-zinc-950 relative">
-          {loadingContent && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/80 z-10">
-              <Loader2 className="w-8 h-8 text-vault-teal animate-spin mb-2" />
-              <span className="text-xs text-vault-muted">Loading file content...</span>
-            </div>
-          )}
-          {activeFile ? (
-            <MonacoEditor
-              height="100%"
-              theme="vs-dark"
-              path={activeFile}
-              value={fileContent}
-              onChange={(val) => {
-                setFileContent(val || "");
-                setIsDirty(true);
-              }}
-              options={{
-                fontSize: 13,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                lineNumbers: "on",
-                renderLineHighlight: "all",
-                tabSize: 2,
-              }}
-            />
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-6">
-              <File className="w-8 h-8 text-vault-muted mb-2 opacity-50" />
-              <p className="text-sm font-medium mb-1">No file open</p>
-              <p className="text-xs text-vault-muted">Select a file from the sidebar tree to start coding</p>
-            </div>
-          )}
+        {/* Monaco Editor & Terminal Container */}
+        <div className="flex-1 flex flex-col min-w-0 bg-zinc-950">
+          <div className="flex-1 relative min-h-0">
+            {loadingContent && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/80 z-10">
+                <Loader2 className="w-8 h-8 text-vault-teal animate-spin mb-2" />
+                <span className="text-xs text-vault-muted">Loading file content...</span>
+              </div>
+            )}
+            {activeFile ? (
+              <MonacoEditor
+                height="100%"
+                theme="vs-dark"
+                path={activeFile}
+                value={fileContent}
+                onChange={(val) => {
+                  setFileContent(val || "");
+                  setIsDirty(true);
+                }}
+                options={{
+                  fontSize: 13,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  lineNumbers: "on",
+                  renderLineHighlight: "all",
+                  tabSize: 2,
+                }}
+              />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                <File className="w-8 h-8 text-vault-muted mb-2 opacity-50" />
+                <p className="text-sm font-medium mb-1">No file open</p>
+                <p className="text-xs text-vault-muted">Select a file from the sidebar tree to start coding</p>
+              </div>
+            )}
+          </div>
+
+          {/* Terminal Console */}
+          <div className="h-72 shrink-0">
+            <WorkspaceTerminal workspaceId={workspaceId} />
+          </div>
         </div>
       </div>
 

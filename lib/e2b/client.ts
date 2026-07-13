@@ -9,7 +9,7 @@ export interface E2BSandbox {
   sandboxId: string;
 }
 
-export async function createSandbox(): Promise<E2BSandbox> {
+export async function createSandbox(timeoutSeconds = 1800): Promise<E2BSandbox> {
   // If no real API key is configured, fallback to mock session id for demo safety
   if (!process.env.E2B_API_KEY) {
     console.warn("[E2B] No E2B_API_KEY found, returning mock sandbox id.");
@@ -24,6 +24,7 @@ export async function createSandbox(): Promise<E2BSandbox> {
     },
     body: JSON.stringify({
       templateId: "base",
+      timeout: timeoutSeconds,
     }),
   });
 
