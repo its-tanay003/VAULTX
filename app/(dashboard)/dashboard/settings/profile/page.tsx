@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState, useTransition } from "react";
 import { createClient }   from "@/lib/supabase/client";
 import { updateProfile, updateProfilePreferences }  from "@/app/actions/profile";
