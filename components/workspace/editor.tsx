@@ -2,12 +2,19 @@
 
 import { useEffect, useState, useTransition } from "react";
 import MonacoEditor from "@monaco-editor/react";
-import { Folder, File, ChevronRight, ChevronDown, Save, GitCommit, Pause, Trash2, Loader2 } from "lucide-react";
-import { getWorkspaceFiles, getWorkspaceFileContent, saveWorkspaceFile, commitAndPushWorkspace, suspendWorkspace, destroyWorkspace } from "@/app/actions/workspace";
+import {
+  Folder, File, ChevronRight, ChevronDown, Save, GitCommit,
+  Pause, Trash2, Loader2, Plus, FilePlus, FolderPlus,
+  X, Edit2
+} from "lucide-react";
+import {
+  getWorkspaceFiles, getWorkspaceFileContent, saveWorkspaceFile,
+  commitAndPushWorkspace, suspendWorkspace, destroyWorkspace,
+  createWorkspaceFile, createWorkspaceFolder, deleteWorkspacePath, renameWorkspacePath
+} from "@/app/actions/workspace";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { WorkspaceTerminal } from "./terminal";
-
 
 interface TreeNode {
   name: string;
@@ -27,14 +34,24 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(true);
 
+  // Multi-file tabs state
+  const [openFiles, setOpenFiles] = useState<string[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const [loadingContent, setLoadingContent] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
+  // Cache to store modified content of unsaved open tabs
+  const [dirtyCache, setDirtyCache] = useState<Record<string, string>>({});
+
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [commitMessage, setCommitMessage] = useState("Update workspace files");
   const [showCommitDialog, setShowCommitDialog] = useState(false);
+
+  // File system creation prompts
+  const [showCreatePrompt, setShowCreatePrompt] = useState<{ isDir: boolean; parentDir?: string } | null>(null);
+  const [newItemName, setNewItemName] = useState("");
+  const [renamePrompt, setRenamePrompt] = useState<{ path: string; oldName: string } | null>(null);
 
   const [isSaving, startSave] = useTransition();
   const [isCommitting, startCommit] = useTransition();
@@ -82,33 +99,42 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
     return root;
   }
 
-  // Load files list on mount
-  useEffect(() => {
-    async function load() {
-      try {
-        const paths = await getWorkspaceFiles(workspaceId);
-        setFiles(paths);
-        setTree(buildTree(paths));
-        if (paths.length > 0) {
-          handleSelectFile(paths[0]);
-        }
-      } catch (err) {
-        toast.error("Failed to load workspace files");
-      } finally {
-        setLoadingFiles(false);
+  // Load files list from sandbox
+  async function refreshFiles(selectPath?: string) {
+    try {
+      const paths = await getWorkspaceFiles(workspaceId);
+      setFiles(paths);
+      setTree(buildTree(paths));
+      if (selectPath && paths.includes(selectPath)) {
+        handleOpenFile(selectPath);
       }
+    } catch (err) {
+      toast.error("Failed to load workspace files");
+    } finally {
+      setLoadingFiles(false);
     }
-    load();
+  }
+
+  useEffect(() => {
+    refreshFiles();
   }, [workspaceId]);
 
-  // Load active file content
-  async function handleSelectFile(path: string) {
-    if (isDirty) {
-      if (!confirm("You have unsaved changes. Discard them?")) return;
+  // Open a file and add it to open tabs list
+  async function handleOpenFile(path: string) {
+    if (!openFiles.includes(path)) {
+      setOpenFiles((prev) => [...prev, path]);
     }
-
     setActiveFile(path);
     setLoadingContent(true);
+
+    // If we have unsaved content in cache, load that instead
+    if (path in dirtyCache) {
+      setFileContent(dirtyCache[path]);
+      setIsDirty(true);
+      setLoadingContent(false);
+      return;
+    }
+
     setIsDirty(false);
     try {
       const text = await getWorkspaceFileContent(workspaceId, path);
@@ -121,18 +147,119 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
     }
   }
 
-  // Save changes locally in E2B sandbox
+  // Save active file changes back to VM filesystem
   function handleSave() {
     if (!activeFile) return;
     startSave(async () => {
       try {
         await saveWorkspaceFile(workspaceId, activeFile, fileContent);
+        // Clear dirty cache for this file
+        setDirtyCache((prev) => {
+          const next = { ...prev };
+          delete next[activeFile];
+          return next;
+        });
         setIsDirty(false);
-        toast.success("File saved locally");
+        toast.success(`Saved ${activeFile.split("/").pop()} successfully`);
       } catch (err) {
         toast.error("Failed to save file");
       }
     });
+  }
+
+  // Close an open tab
+  function handleCloseFile(path: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (path in dirtyCache) {
+      if (!confirm(`Discard unsaved changes for ${path.split("/").pop()}?`)) return;
+    }
+
+    const nextOpen = openFiles.filter((p) => p !== path);
+    setOpenFiles(nextOpen);
+
+    // Remove from cache
+    setDirtyCache((prev) => {
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+
+    if (activeFile === path) {
+      if (nextOpen.length > 0) {
+        handleOpenFile(nextOpen[nextOpen.length - 1]);
+      } else {
+        setActiveFile(null);
+        setFileContent("");
+        setIsDirty(false);
+      }
+    }
+  }
+
+  // Filesystem CRUD triggers
+  async function handleCreateItem() {
+    if (!newItemName.trim()) return;
+    const path = showCreatePrompt?.parentDir
+      ? `${showCreatePrompt.parentDir}/${newItemName.trim()}`
+      : newItemName.trim();
+
+    try {
+      if (showCreatePrompt?.isDir) {
+        await createWorkspaceFolder(workspaceId, path);
+        toast.success(`Folder ${newItemName} created`);
+      } else {
+        await createWorkspaceFile(workspaceId, path);
+        toast.success(`File ${newItemName} created`);
+      }
+      setShowCreatePrompt(null);
+      setNewItemName("");
+      refreshFiles(showCreatePrompt?.isDir ? undefined : path);
+    } catch (err) {
+      toast.error("Failed to create item");
+    }
+  }
+
+  async function handleDeleteItem(path: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete ${path}?`)) {
+      try {
+        await deleteWorkspacePath(workspaceId, path);
+        toast.success(`${path} deleted`);
+
+        // Close any tabs that were inside deleted path
+        const nextOpen = openFiles.filter((p) => !p.startsWith(path));
+        setOpenFiles(nextOpen);
+        if (activeFile && activeFile.startsWith(path)) {
+          if (nextOpen.length > 0) {
+            handleOpenFile(nextOpen[nextOpen.length - 1]);
+          } else {
+            setActiveFile(null);
+            setFileContent("");
+            setIsDirty(false);
+          }
+        }
+
+        refreshFiles();
+      } catch (err) {
+        toast.error("Failed to delete item");
+      }
+    }
+  }
+
+  async function handleRenameItem() {
+    if (!renamePrompt || !newItemName.trim()) return;
+    const parts = renamePrompt.path.split("/");
+    parts[parts.length - 1] = newItemName.trim();
+    const newPath = parts.join("/");
+
+    try {
+      await renameWorkspacePath(workspaceId, renamePrompt.path, newPath);
+      toast.success("Item renamed successfully");
+      setRenamePrompt(null);
+      setNewItemName("");
+      refreshFiles();
+    } catch (err) {
+      toast.error("Failed to rename item");
+    }
   }
 
   // Commit and Push to remote branch
@@ -148,7 +275,7 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
     });
   }
 
-  // Suspend Sandbox VM
+  // Suspend VM session
   function handleSuspend() {
     if (confirm("Are you sure you want to suspend this workspace? VM session will be stopped.")) {
       startSuspend(async () => {
@@ -189,8 +316,8 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
     return (
       <div key={node.path} className="select-none">
         <div
-          onClick={() => (node.isDir ? toggleNode(node.path) : handleSelectFile(node.path))}
-          className={`flex items-center justify-between py-1.5 px-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+          onClick={() => (node.isDir ? toggleNode(node.path) : handleOpenFile(node.path))}
+          className={`flex items-center justify-between py-1.5 px-2 rounded-lg text-xs font-medium cursor-pointer transition-colors group ${
             isSelected
               ? "bg-vault-teal/10 text-vault-teal border border-vault-teal/20"
               : "text-vault-muted hover:text-vault-text hover:bg-vault-elevated/50"
@@ -211,6 +338,52 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
             )}
             <span className="truncate">{node.name}</span>
           </div>
+
+          {/* Action buttons on hover */}
+          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 shrink-0 ml-1">
+            {node.isDir && (
+              <>
+                <button
+                  title="New File"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowCreatePrompt({ isDir: false, parentDir: node.path });
+                  }}
+                  className="p-0.5 hover:text-vault-teal"
+                >
+                  <FilePlus className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  title="New Folder"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowCreatePrompt({ isDir: true, parentDir: node.path });
+                  }}
+                  className="p-0.5 hover:text-vault-teal"
+                >
+                  <FolderPlus className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+            <button
+              title="Rename"
+              onClick={(e) => {
+                e.stopPropagation();
+                setNewItemName(node.name);
+                setRenamePrompt({ path: node.path, oldName: node.name });
+              }}
+              className="p-0.5 hover:text-vault-teal"
+            >
+              <Edit2 className="w-3 h-3" />
+            </button>
+            <button
+              title="Delete"
+              onClick={(e) => handleDeleteItem(node.path, e)}
+              className="p-0.5 hover:text-red-400"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
         </div>
 
         {node.isDir && isExpanded && node.children && (
@@ -223,12 +396,12 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
   }
 
   return (
-    <div className="flex flex-col h-[750px] bg-vault-surface border border-vault-border rounded-2xl overflow-hidden shadow-xl">
+    <div className="flex flex-col h-[800px] bg-vault-surface border border-vault-border rounded-2xl overflow-hidden shadow-xl">
       {/* Header bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-vault-border bg-vault-bg shrink-0">
         <div>
           <h2 className="text-sm font-semibold">{repoName}</h2>
-          <p className="text-[10px] text-vault-muted mt-0.5">E2B Sandboxed Sandbox Workspace</p>
+          <p className="text-[10px] text-vault-muted mt-0.5">E2B Sandboxed IDE Workspace</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -277,9 +450,28 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
       {/* Main split view */}
       <div className="flex-1 flex min-h-0">
         {/* Sidebar File Tree */}
-        <div className="w-60 border-r border-vault-border bg-vault-bg p-4 overflow-y-auto shrink-0 space-y-2">
-          <span className="text-[10px] uppercase font-bold text-vault-muted tracking-wider block mb-2">Files</span>
-          <div className="space-y-1">
+        <div className="w-64 border-r border-vault-border bg-vault-bg p-4 overflow-y-auto shrink-0 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <span className="text-[10px] uppercase font-bold text-vault-muted tracking-wider">Workspace Files</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                title="New File at Root"
+                onClick={() => setShowCreatePrompt({ isDir: false })}
+                className="p-1 rounded hover:bg-vault-elevated text-vault-muted hover:text-vault-teal transition-colors"
+              >
+                <FilePlus className="w-3.5 h-3.5" />
+              </button>
+              <button
+                title="New Folder at Root"
+                onClick={() => setShowCreatePrompt({ isDir: true })}
+                className="p-1 rounded hover:bg-vault-elevated text-vault-muted hover:text-vault-teal transition-colors"
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-1">
             {loadingFiles ? (
               <div className="flex flex-col items-center justify-center py-12 space-y-2">
                 <Loader2 className="w-5 h-5 animate-spin text-vault-teal" />
@@ -293,6 +485,36 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
 
         {/* Monaco Editor & Terminal Container */}
         <div className="flex-1 flex flex-col min-w-0 bg-zinc-950">
+          {/* Open Tabs Headers */}
+          <div className="flex items-center bg-zinc-900 border-b border-vault-border overflow-x-auto shrink-0 scrollbar-none h-9">
+            {openFiles.map((path) => {
+              const isActive = activeFile === path;
+              const hasUnsaved = path in dirtyCache;
+              return (
+                <div
+                  key={path}
+                  onClick={() => handleOpenFile(path)}
+                  className={`flex items-center gap-2 px-4 h-full border-r border-vault-border text-xs cursor-pointer select-none transition-colors ${
+                    isActive
+                      ? "bg-zinc-950 text-vault-teal font-semibold border-t-2 border-t-vault-teal"
+                      : "text-zinc-400 hover:bg-zinc-950/50 hover:text-zinc-200"
+                  }`}
+                >
+                  <File className="w-3.5 h-3.5 opacity-60" />
+                  <span className="truncate max-w-[120px]">{path.split("/").pop()}</span>
+                  {hasUnsaved && <span className="w-1.5 h-1.5 rounded-full bg-vault-teal shrink-0" />}
+                  <button
+                    onClick={(e) => handleCloseFile(path, e)}
+                    className="p-0.5 rounded-full hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Monaco Frame */}
           <div className="flex-1 relative min-h-0">
             {loadingContent && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/80 z-10">
@@ -309,6 +531,8 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
                 onChange={(val) => {
                   setFileContent(val || "");
                   setIsDirty(true);
+                  // Cache unsaved tab edits
+                  setDirtyCache((prev) => ({ ...prev, [activeFile]: val || "" }));
                 }}
                 options={{
                   fontSize: 13,
@@ -322,8 +546,8 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6">
                 <File className="w-8 h-8 text-vault-muted mb-2 opacity-50" />
-                <p className="text-sm font-medium mb-1">No file open</p>
-                <p className="text-xs text-vault-muted">Select a file from the sidebar tree to start coding</p>
+                <p className="text-sm font-medium mb-1">No open tabs</p>
+                <p className="text-xs text-vault-muted">Select or create a file to start coding</p>
               </div>
             )}
           </div>
@@ -367,6 +591,90 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
               >
                 {isCommitting && <Loader2 className="w-3 h-3 animate-spin" />}
                 Confirm & Push
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Prompt Modal */}
+      {showCreatePrompt && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50 animate-in">
+          <div className="bg-vault-surface border border-vault-border rounded-xl p-5 w-[320px] space-y-4 shadow-2xl">
+            <div>
+              <h3 className="text-sm font-semibold">
+                Create New {showCreatePrompt.isDir ? "Folder" : "File"}
+              </h3>
+              {showCreatePrompt.parentDir && (
+                <p className="text-[10px] text-vault-muted mt-1">Inside: {showCreatePrompt.parentDir}</p>
+              )}
+            </div>
+
+            <input
+              type="text"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              className="vault-input w-full text-xs p-2"
+              placeholder={showCreatePrompt.isDir ? "folder-name" : "file-name.js"}
+              autoFocus
+            />
+
+            <div className="flex items-center justify-end gap-2 text-xs">
+              <button
+                onClick={() => {
+                  setShowCreatePrompt(null);
+                  setNewItemName("");
+                }}
+                className="btn-ghost"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateItem}
+                disabled={!newItemName.trim()}
+                className="btn-primary"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Prompt Modal */}
+      {renamePrompt && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50 animate-in">
+          <div className="bg-vault-surface border border-vault-border rounded-xl p-5 w-[320px] space-y-4 shadow-2xl">
+            <div>
+              <h3 className="text-sm font-semibold">Rename Item</h3>
+              <p className="text-[10px] text-vault-muted mt-1">Old name: {renamePrompt.oldName}</p>
+            </div>
+
+            <input
+              type="text"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              className="vault-input w-full text-xs p-2"
+              placeholder="New name"
+              autoFocus
+            />
+
+            <div className="flex items-center justify-end gap-2 text-xs">
+              <button
+                onClick={() => {
+                  setRenamePrompt(null);
+                  setNewItemName("");
+                }}
+                className="btn-ghost"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRenameItem}
+                disabled={!newItemName.trim() || newItemName.trim() === renamePrompt.oldName}
+                className="btn-primary"
+              >
+                Rename
               </button>
             </div>
           </div>

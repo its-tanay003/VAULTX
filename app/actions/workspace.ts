@@ -311,3 +311,32 @@ export async function runTerminalCommand(
   return runCommand(ws.sandbox_id, cmd);
 }
 
+export async function createWorkspaceFile(workspaceId: string, path: string): Promise<void> {
+  const { supabase } = await getAuthedUser();
+  const { data: ws } = await supabase.from("workspaces").select("*").eq("id", workspaceId).single();
+  if (!ws || !ws.sandbox_id) throw new Error("Workspace not active");
+  await runCommand(ws.sandbox_id, `touch "${path.replace(/"/g, '\\"')}"`);
+}
+
+export async function createWorkspaceFolder(workspaceId: string, path: string): Promise<void> {
+  const { supabase } = await getAuthedUser();
+  const { data: ws } = await supabase.from("workspaces").select("*").eq("id", workspaceId).single();
+  if (!ws || !ws.sandbox_id) throw new Error("Workspace not active");
+  await runCommand(ws.sandbox_id, `mkdir -p "${path.replace(/"/g, '\\"')}"`);
+}
+
+export async function deleteWorkspacePath(workspaceId: string, path: string): Promise<void> {
+  const { supabase } = await getAuthedUser();
+  const { data: ws } = await supabase.from("workspaces").select("*").eq("id", workspaceId).single();
+  if (!ws || !ws.sandbox_id) throw new Error("Workspace not active");
+  await runCommand(ws.sandbox_id, `rm -rf "${path.replace(/"/g, '\\"')}"`);
+}
+
+export async function renameWorkspacePath(workspaceId: string, oldPath: string, newPath: string): Promise<void> {
+  const { supabase } = await getAuthedUser();
+  const { data: ws } = await supabase.from("workspaces").select("*").eq("id", workspaceId).single();
+  if (!ws || !ws.sandbox_id) throw new Error("Workspace not active");
+  await runCommand(ws.sandbox_id, `mv "${oldPath.replace(/"/g, '\\"')}" "${newPath.replace(/"/g, '\\"')}"`);
+}
+
+
