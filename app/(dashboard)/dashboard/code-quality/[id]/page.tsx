@@ -4,6 +4,7 @@ import Link                   from "next/link";
 import { ChevronLeft, GitBranch, ExternalLink, Code2, Shield } from "lucide-react";
 import { RescanButton }      from "@/components/code-quality/rescan-button";
 import { Web3AuditButton }   from "@/components/code-quality/web3-audit-button";
+import { OpenWorkspaceButton } from "@/components/workspace/open-workspace-button";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Metadata }     from "next";
 import { VaultContextSetter } from "@/components/vault/vault-context-setter";
@@ -24,13 +25,22 @@ export default async function CodeScanDetailPage(props: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: repo } = await supabase
-    .from("code_repos")
-    .select(`*, code_scans(id, status, scan_type, score, summary, findings, files_scanned, error, created_at, completed_at)`)
-    .eq("id", params.id)
-    .single();
+  const [{ data: repo }, { data: workspace }] = await Promise.all([
+    supabase
+      .from("code_repos")
+      .select(`*, code_scans(id, status, scan_type, score, summary, findings, files_scanned, error, created_at, completed_at)`)
+      .eq("id", params.id)
+      .single(),
+    supabase
+      .from("workspaces")
+      .select("id")
+      .eq("repo_id", params.id)
+      .eq("user_id", user.id)
+      .maybeSingle()
+  ]);
 
   if (!repo) notFound();
+
 
   const scansArray = (repo.code_scans ?? []) as Array<{
     id: string;
@@ -85,10 +95,12 @@ export default async function CodeScanDetailPage(props: Props) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <OpenWorkspaceButton repoId={repo.id} branch={repo.default_branch} existingWorkspaceId={workspace?.id} />
           <Web3AuditButton repoId={repo.id} isRunning={latestWeb3?.status === "running"} />
           <RescanButton repoId={repo.id} isScanning={latestGeneral?.status === "running"} />
         </div>
       </div>
+
 
       {/* Tab switcher when both scan types exist */}
       {latestWeb3 && latestGeneral && (
