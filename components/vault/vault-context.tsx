@@ -10,7 +10,10 @@ export interface VaultContextShape {
   repoId?: string;
   engagementId?: string;
   targetId?: string;
+  competitionId?: string;
+  contestId?: string;
 }
+
 
 const VaultContextCtx = createContext<{
   context: VaultContextShape;
@@ -39,5 +42,5 @@ export function useSetVaultContext(ctx: VaultContextShape) {
     setContext(ctx);
     return () => setContext({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx.submissionId, ctx.programId, ctx.researcherId, ctx.page]);
+  }, [ctx.submissionId, ctx.programId, ctx.researcherId, ctx.page, ctx.competitionId, ctx.contestId]);
 }

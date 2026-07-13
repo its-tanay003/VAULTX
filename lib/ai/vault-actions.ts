@@ -28,11 +28,17 @@ import { runScan, runWeb3Audit } from "@/app/actions/code-quality";
 import { triggerScan as triggerRedTeamScan } from "@/app/actions/red-team";
 import { requestMoreInfo } from "@/app/actions/triage";
 import { generateEngagementReportPdf } from "@/lib/ptaas/report-generation";
+import { updateUserSettings, getUserSettings } from "@/app/actions/settings";
+import { updateProfilePreferences } from "@/app/actions/profile";
+import { draftChallenge } from "@/app/actions/ctf";
+import { createClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/supabase/types";
+
 
 export type ActionType =
   | "trigger_code_scan" | "trigger_web3_audit" | "generate_ptaas_report"
-  | "trigger_red_team_scan" | "request_more_info";
+  | "trigger_red_team_scan" | "request_more_info" | "toggle_setting" | "draft_ctf_challenge";
+
 
 export interface ActionDefinition {
   type: ActionType;
@@ -76,6 +82,26 @@ export const ACTION_REGISTRY: Record<ActionType, ActionDefinition> = {
     allowedRoles: ["triager", "admin", "org"],
     paramSchema: { submissionId: "string", question: "string" },
     describe: (params) => `Send a "needs more info" request to the researcher: "${params.question ?? ""}"`,
+  },
+  toggle_setting: {
+    type: "toggle_setting",
+    allowedRoles: ["org", "researcher", "triager", "admin"],
+    paramSchema: { key: "string" },
+    describe: (params) => `Toggle preference/setting: ${params.key}`,
+  },
+  draft_ctf_challenge: {
+    type: "draft_ctf_challenge",
+    allowedRoles: ["org", "admin"],
+    paramSchema: {
+      competitionId: "string",
+      title: "string",
+      description: "string",
+      category: "string",
+      difficulty: "string",
+      flag: "string",
+      hint: "string"
+    },
+    describe: (params) => `Draft a new CTF challenge titled "${params.title}"`,
   },
 };
 
@@ -138,6 +164,44 @@ export async function executeAction(type: ActionType, params: Record<string, str
       case "request_more_info": {
         await requestMoreInfo(params.submissionId, params.question);
         return { success: true, result: { submissionId: params.submissionId, message: "Request sent to researcher" } };
+      }
+      case "toggle_setting": {
+        const allowedKeys = ["marketing_emails", "security_alerts", "weekly_digest", "reduced_motion", "high_contrast", "ai_training_opt_in"];
+        const key = params.key;
+        if (!allowedKeys.includes(key)) {
+          return { success: false, error: `Setting key "${key}" is not allow-listed or is security-sensitive.` };
+        }
+
+        const userSettingsKeys = ["marketing_emails", "security_alerts", "weekly_digest"];
+        const profileKeys = ["reduced_motion", "high_contrast", "ai_training_opt_in"];
+
+        if (userSettingsKeys.includes(key)) {
+          const currentSettings = await getUserSettings();
+          const currentVal = !!currentSettings[key as keyof typeof currentSettings];
+          await updateUserSettings({ [key]: !currentVal });
+          return { success: true, result: { key, newValue: !currentVal, message: `Successfully toggled ${key} to ${!currentVal}` } };
+        } else if (profileKeys.includes(key)) {
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error("Not authenticated");
+          const { data: profile } = await supabase.from("profiles").select(key).eq("id", user.id).single();
+          const currentVal = !!profile?.[key as keyof typeof profile];
+          await updateProfilePreferences({ [key]: !currentVal });
+          return { success: true, result: { key, newValue: !currentVal, message: `Successfully toggled ${key} to ${!currentVal}` } };
+        }
+        return { success: false, error: "Invalid setting category" };
+      }
+      case "draft_ctf_challenge": {
+        await draftChallenge({
+          competitionId: params.competitionId,
+          title: params.title,
+          description: params.description,
+          category: params.category,
+          difficulty: params.difficulty,
+          flag: params.flag,
+          hint: params.hint
+        });
+        return { success: true, result: { title: params.title, message: "Draft challenge successfully created" } };
       }
       default:
         return { success: false, error: "Unknown action type" };

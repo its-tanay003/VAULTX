@@ -8,6 +8,8 @@ import {
 import { CompetitionStatusControl } from "@/components/ctf/competition-status-control";
 import { formatDate }               from "@/lib/utils";
 import type { Metadata }            from "next";
+import { VaultContextSetter }       from "@/components/vault/vault-context-setter";
+
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -61,6 +63,7 @@ export default async function CTFManagePage(props: Props) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-in">
+      <VaultContextSetter page="ctf_management" competitionId={competition.id} />
       <div className="flex items-start gap-3">
         <Link href="/dashboard/ctf" className="text-vault-muted hover:text-vault-text transition-colors mt-1">
           <ChevronLeft className="w-4 h-4" />

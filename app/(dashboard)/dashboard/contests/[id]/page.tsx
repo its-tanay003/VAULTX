@@ -10,6 +10,7 @@ import { PayoutTable }          from "@/components/contests/payout-table";
 import { computeContestStats }  from "@/lib/ai/contest-distribution";
 import { formatDate, formatCurrency, truncate } from "@/lib/utils";
 import type { Metadata } from "next";
+import { VaultContextSetter } from "@/components/vault/vault-context-setter";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -71,6 +72,7 @@ export default async function ContestDetailPage(props: Props) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-5 animate-in">
+      <VaultContextSetter page="contest_detail" contestId={contest.id} />
       {/* Header */}
       <div className="flex items-start gap-3">
         <Link href="/dashboard/contests" className="text-vault-muted hover:text-vault-text transition-colors mt-1">

@@ -191,3 +191,44 @@ export async function deleteChallenge(
   if (error) throw new Error(error.message);
   revalidatePath(`/dashboard/ctf/${competitionId}`);
 }
+
+/* ─── Draft challenge (agent action) ──────────────────────────────────────── */
+export async function draftChallenge(params: {
+  competitionId: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  flag: string;
+  hint?: string;
+}) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  if (!params.title || !params.description || !params.category || !params.difficulty || !params.flag) {
+    throw new Error("Title, description, category, difficulty, and flag are required");
+  }
+
+  const flagHash = createHash("sha256").update(params.flag).digest("hex");
+
+  const { error } = await supabase
+    .from("ctf_challenges")
+    .insert({
+      competition_id: params.competitionId,
+      title: params.title,
+      description: params.description,
+      category: params.category,
+      difficulty: params.difficulty,
+      flag_hash: flagHash,
+      base_points: 500,
+      min_points: 100,
+      hint: params.hint || null,
+      hint_cost: 50,
+      is_visible: false, // invisible = draft
+    });
+
+  if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/ctf/${params.competitionId}`);
+}
+

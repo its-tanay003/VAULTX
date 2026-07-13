@@ -27,7 +27,10 @@ export interface VaultContext {
   repoId?:        string;
   engagementId?:  string;
   targetId?:      string;
+  competitionId?: string;
+  contestId?:     string;
 }
+
 
 const RESEARCHER_PERSONA = `You are VAULT, VAULTX's resident AI security intelligence agent, talking to a security researcher.
 
@@ -139,6 +142,22 @@ export async function gatherContextData(context: VaultContext): Promise<string> 
     const { data: target } = await supabase.from("red_team_targets").select("domain, is_active").eq("id", context.targetId).single();
     if (target) {
       parts.push(`Currently viewing AI Red Team target: ${target.domain} (id: ${context.targetId}, active: ${target.is_active} — use this exact id for any scan action on this target).`);
+    }
+  }
+
+  if (context.competitionId) {
+    const { data: comp } = await supabase
+      .from("ctf_competitions").select("title, description, status, starts_at, ends_at").eq("id", context.competitionId).single();
+    if (comp) {
+      parts.push(`Currently viewing CTF competition: "${comp.title}" (status: ${comp.status}, starts: ${comp.starts_at}, ends: ${comp.ends_at}). Description: ${comp.description}. (id: ${context.competitionId} — use this exact id for any CTF draft action).`);
+    }
+  }
+
+  if (context.contestId) {
+    const { data: contest } = await supabase
+      .from("audit_contests").select("title, description, status, pool_amount, starts_at, ends_at").eq("id", context.contestId).single();
+    if (contest) {
+      parts.push(`Currently viewing Audit Contest: "${contest.title}" (status: ${contest.status}, pool: ${contest.pool_amount}, starts: ${contest.starts_at}, ends: ${contest.ends_at}). Description: ${contest.description}.`);
     }
   }
 

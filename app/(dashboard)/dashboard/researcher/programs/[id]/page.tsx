@@ -8,6 +8,8 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Metadata } from "next";
 
+import { VaultContextSetter } from "@/components/vault/vault-context-setter";
+
 interface Props { params: Promise<{ id: string }> }
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
@@ -46,6 +48,7 @@ export default async function ResearcherProgramDetailPage(props: Props) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-in">
+      <VaultContextSetter page="researcher_program_detail" programId={program.id} />
       {/* Header */}
       <div className="flex items-start gap-3">
         <Link
