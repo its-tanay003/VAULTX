@@ -5,7 +5,7 @@ import MonacoEditor from "@monaco-editor/react";
 import {
   Folder, File, ChevronRight, ChevronDown, Save, GitCommit,
   Pause, Trash2, Loader2, Plus, FilePlus, FolderPlus,
-  X, Edit2, Sparkles, Terminal as TerminalIcon, AlertCircle, FileCode, HelpCircle
+  X, Edit2, Sparkles, Terminal as TerminalIcon, AlertCircle, FileCode, HelpCircle, Users
 } from "lucide-react";
 import {
   getWorkspaceFiles, getWorkspaceFileContent, saveWorkspaceFile,
@@ -20,6 +20,9 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { WorkspaceTerminal } from "./terminal";
+import { createClient } from "@/lib/supabase/client";
+import * as Y from "yjs";
+import { SupabaseYjsProvider } from "@/lib/collaboration/collaboration-provider";
 
 interface TreeNode {
   name: string;
@@ -83,6 +86,11 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
 
   const [isInlineCompleting, setIsInlineCompleting] = useState(false);
 
+  // Real-Time Collaboration state refs
+  const ydocRef = useRef<Y.Doc | null>(null);
+  const collabProviderRef = useRef<SupabaseYjsProvider | null>(null);
+  const isSyncingRef = useRef(false);
+
   // Helper: build nested tree
   function buildTree(paths: string[]): TreeNode[] {
     const root: TreeNode[] = [];
@@ -144,6 +152,62 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
     refreshFiles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
+
+  // Handle Real-Time Collaboration Setup on activeFile change
+  useEffect(() => {
+    // 1. Teardown previous providers
+    if (collabProviderRef.current) {
+      collabProviderRef.current.destroy();
+      collabProviderRef.current = null;
+    }
+    if (ydocRef.current) {
+      ydocRef.current.destroy();
+      ydocRef.current = null;
+    }
+
+    if (!activeFile) return;
+
+    // 2. Setup Yjs Doc and Supabase collaboration provider
+    const ydoc = new Y.Doc();
+    const supabase = createClient();
+    const safeChannelName = `collab-${workspaceId}-${activeFile.replace(/[^a-zA-Z0-9-_]/g, "-")}`.substring(0, 100);
+
+    const provider = new SupabaseYjsProvider(supabase, safeChannelName, ydoc);
+    const ytext = ydoc.getText("content");
+
+    // Pre-populate with current local file content
+    if (fileContent && ytext.length === 0) {
+      ytext.insert(0, fileContent);
+    }
+
+    // Listen for collaborative updates from peer cursors
+    ytext.observe((event) => {
+      if (isSyncingRef.current) return;
+      isSyncingRef.current = true;
+
+      const textVal = ytext.toString();
+      setFileContent(textVal);
+
+      if (editorRef.current) {
+        const model = editorRef.current.getModel();
+        if (model && model.getValue() !== textVal) {
+          const position = editorRef.current.getPosition();
+          editorRef.current.setValue(textVal);
+          if (position) editorRef.current.setPosition(position);
+        }
+      }
+      isSyncingRef.current = false;
+    });
+
+    ydocRef.current = ydoc;
+    collabProviderRef.current = provider;
+
+    return () => {
+      provider.destroy();
+      ydoc.destroy();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFile]);
 
   // Open a file and add it to open tabs list
   async function handleOpenFile(path: string) {
@@ -497,7 +561,12 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
       <div className="flex items-center justify-between px-6 py-4 border-b border-vault-border bg-vault-bg shrink-0">
         <div>
           <h2 className="text-sm font-semibold">{repoName}</h2>
-          <p className="text-[10px] text-vault-muted mt-0.5">E2B Sandboxed IDE Workspace</p>
+          <p className="text-[10px] text-vault-muted mt-0.5 flex items-center gap-1.5">
+            E2B Sandboxed IDE Workspace
+            <span className="flex items-center gap-1 text-vault-teal bg-vault-teal/5 px-1.5 py-0.5 rounded border border-vault-teal/15 font-semibold text-[9px] uppercase tracking-wider">
+              <Users className="w-3 h-3" /> Live Collaboration Active
+            </span>
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -779,6 +848,17 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
                   setIsDirty(true);
                   // Cache unsaved tab edits
                   setDirtyCache((prev) => ({ ...prev, [activeFile]: val || "" }));
+
+                  // Propagate local mutations over CRDT document
+                  if (ydocRef.current && !isSyncingRef.current) {
+                    isSyncingRef.current = true;
+                    const ytext = ydocRef.current.getText("content");
+                    ydocRef.current.transact(() => {
+                      ytext.delete(0, ytext.length);
+                      ytext.insert(0, val || "");
+                    });
+                    isSyncingRef.current = false;
+                  }
                 }}
                 options={{
                   fontSize: 13,

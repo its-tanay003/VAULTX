@@ -55,7 +55,8 @@
     "stripe": "^16.2.0",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@lhci/cli": "^0.14.0",

@@ -65,6 +65,7 @@ interface CallOptions {
   user:         string;
   maxTokens?:   number;
   temperature?: number;
+  taskType?:    string;
 }
 
 /** Helper to fetch with an absolute timeout */
@@ -90,22 +91,73 @@ export interface AIMessage extends ClaudeMessage {
 
 /* ─── Public entry point — unchanged signature from Week 4 ───────────────── */
 export async function callClaude(opts: CallOptions): Promise<AIMessage> {
+  const startTime = Date.now();
+  const taskType = opts.taskType || "unspecified";
+
   try {
-    return await callAnthropic(opts);
+    const res = await callAnthropic(opts);
+    const latency = Date.now() - startTime;
+    // Log success for Claude
+    logTelemetry("claude", ANTHROPIC_MODEL, taskType, res.usage.input_tokens, res.usage.output_tokens, latency, true);
+    return res;
   } catch (claudeErr) {
     const claudeMsg = claudeErr instanceof Error ? claudeErr.message : String(claudeErr);
     console.warn(`[AI] Claude failed, falling back to Gemini. Reason: ${claudeMsg}`);
 
+    // Log failure for Claude
+    const claudeLatency = Date.now() - startTime;
+    logTelemetry("claude", ANTHROPIC_MODEL, taskType, 0, 0, claudeLatency, false, claudeMsg);
+
+    const geminiStartTime = Date.now();
     try {
-      return await callGemini(opts);
+      const res = await callGemini(opts);
+      const latency = Date.now() - geminiStartTime;
+      // Log success for Gemini
+      logTelemetry("gemini", GEMINI_MODEL, taskType, res.usage.input_tokens, res.usage.output_tokens, latency, true);
+      return res;
     } catch (geminiErr) {
       const geminiMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+      const geminiLatency = Date.now() - geminiStartTime;
+      // Log failure for Gemini
+      logTelemetry("gemini", GEMINI_MODEL, taskType, 0, 0, geminiLatency, false, geminiMsg);
+
       throw new Error(
         `Both AI providers failed. Claude: ${claudeMsg} | Gemini: ${geminiMsg}`
       );
     }
   }
 }
+
+async function logTelemetry(
+  provider: string,
+  model: string,
+  taskType: string,
+  promptTokens: number,
+  completionTokens: number,
+  latencyMs: number,
+  success: boolean,
+  errorMessage?: string
+) {
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("ai_call_logs").insert({
+      user_id: user?.id || null,
+      provider,
+      model,
+      task_type: taskType,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      latency_ms: latencyMs,
+      success,
+      error_message: errorMessage || null,
+    });
+  } catch (err) {
+    console.error("[AI Telemetry] Failed to write log:", err);
+  }
+}
+
 
 /* ─── Anthropic Claude (primary) ──────────────────────────────────────────── */
 async function callAnthropic(opts: CallOptions): Promise<AIMessage> {

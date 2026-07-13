@@ -120,6 +120,7 @@ Write the code for ${targetPath}. Start directly with the code contents.`;
     system: systemPrompt,
     user: userPrompt,
     maxTokens: 2048,
+    taskType: "code_generation",
   });
 
   const responseText = response.content.map((c) => c.text).join("");
@@ -166,6 +167,7 @@ Explain the bug and provide the fix.`;
     system: systemPrompt,
     user: userPrompt,
     maxTokens: 1024,
+    taskType: "debugging_assistance",
   });
 
   const responseText = response.content.map((c) => c.text).join("");
