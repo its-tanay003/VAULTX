@@ -1,24 +1,11 @@
-"use client";
-
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { toast }           from "sonner";
 import { Loader2, Lock, Shield, Monitor, Eye, EyeOff, QrCode } from "lucide-react";
 import { changePassword }  from "@/app/actions/settings";
 import { SectionCard, FieldRow, SettingsToggle } from "@/components/settings/section-card";
 import { SessionList }     from "@/components/settings/session-list";
-import type { ActiveSession } from "@/app/actions/settings";
-
-// Demo sessions (in production, fetched from user_settings.active_sessions)
-const DEMO_SESSIONS: ActiveSession[] = [
-  {
-    id: "current",
-    device: "Desktop",
-    ip: "192.168.1.1",
-    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125",
-    last_seen: new Date().toISOString(),
-    is_current: true,
-  },
-];
+import type { ActiveSession } from "@/app/actions/sessions";
+import { listActiveSessions, revokeSession } from "@/app/actions/sessions";
 
 export default function SecuritySettingsPage() {
   const [pwPending, startPw]     = useTransition();
@@ -30,7 +17,22 @@ export default function SecuritySettingsPage() {
 
   const [twoFA, setTwoFA]             = useState(false);
   const [showQR, setShowQR]           = useState(false);
-  const [sessions, setSessions]       = useState<ActiveSession[]>(DEMO_SESSIONS);
+  const [sessions, setSessions]       = useState<ActiveSession[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+
+  useEffect(() => {
+    async function loadSessions() {
+      try {
+        const data = await listActiveSessions();
+        setSessions(data);
+      } catch (err: any) {
+        toast.error("Failed to load active sessions");
+      } finally {
+        setLoadingSessions(false);
+      }
+    }
+    loadSessions();
+  }, []);
 
   function handleChangePassword() {
     startPw(async () => {
@@ -59,9 +61,27 @@ export default function SecuritySettingsPage() {
     }
   }
 
-  function handleRevokeSession(id: string) {
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    toast.success("Session revoked");
+  async function handleRevokeSession(id: string) {
+    try {
+      await revokeSession(id);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      toast.success("Session revoked");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to revoke session");
+    }
+  }
+
+  async function handleRevokeAllOthers() {
+    const others = sessions.filter((s) => !s.is_current);
+    try {
+      for (const s of others) {
+        await revokeSession(s.id);
+      }
+      setSessions((prev) => prev.filter((s) => s.is_current));
+      toast.success("All other sessions revoked");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to revoke some sessions");
+    }
   }
 
   const pwStrength = (() => {
@@ -168,14 +188,23 @@ export default function SecuritySettingsPage() {
 
       {/* Sessions */}
       <SectionCard title="Active Sessions" description="Devices currently signed in to your account">
-        <SessionList sessions={sessions} onRevoke={handleRevokeSession} />
-        {sessions.filter((s) => !s.is_current).length > 0 && (
-          <button
-            onClick={() => setSessions(sessions.filter((s) => s.is_current))}
-            className="mt-4 text-xs text-red-400 hover:text-red-300 transition-colors"
-          >
-            Revoke all other sessions
-          </button>
+        {loadingSessions ? (
+          <div className="flex items-center gap-2 text-xs text-vault-muted py-4">
+            <Loader2 className="w-4 h-4 animate-spin text-vault-teal" />
+            Loading active sessions...
+          </div>
+        ) : (
+          <>
+            <SessionList sessions={sessions} onRevoke={handleRevokeSession} />
+            {sessions.filter((s) => !s.is_current).length > 0 && (
+              <button
+                onClick={handleRevokeAllOthers}
+                className="mt-4 text-xs text-red-400 hover:text-red-300 transition-colors"
+              >
+                Revoke all other sessions
+              </button>
+            )}
+          </>
         )}
       </SectionCard>
     </div>

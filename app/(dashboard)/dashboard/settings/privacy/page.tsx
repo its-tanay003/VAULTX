@@ -1,11 +1,11 @@
-"use client";
-
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast }               from "sonner";
 import { Loader2, Save, Download, Clock } from "lucide-react";
 import { updateUserSettings, requestDataExport } from "@/app/actions/settings";
 import { SectionCard, FieldRow, SettingsToggle } from "@/components/settings/section-card";
 import { VaultAgentModeToggle } from "@/components/vault/vault-agent-mode-toggle";
+import { createClient } from "@/lib/supabase/client";
+import { updateProfilePreferences } from "@/app/actions/profile";
 import { cn } from "@/lib/utils";
 
 type Visibility = "public" | "org_only" | "private";
@@ -29,6 +29,38 @@ export default function PrivacySettingsPage() {
   const [visibility, setVisibility]         = useState<Visibility>("public");
   const [hideLeaderboard, setHideLeaderboard] = useState(false);
   const [showActivity, setShowActivity]       = useState(true);
+  const [aiTrainingOptIn, setAiTrainingOptIn] = useState(false);
+  const [loading, setLoading]                 = useState(true);
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch user settings
+        const { data: settings } = await supabase.from("user_settings").select("*").eq("id", user.id).single();
+        if (settings) {
+          setVisibility(settings.data_visibility || "public");
+          setHideLeaderboard(settings.hide_from_leaderboard || false);
+          setShowActivity(settings.show_activity || false);
+        }
+
+        // Fetch AI Training Preference from profiles
+        const { data: profile } = await supabase.from("profiles").select("ai_training_opt_in").eq("id", user.id).single();
+        if (profile) {
+          setAiTrainingOptIn(profile.ai_training_opt_in || false);
+        }
+      } catch (err) {
+        console.error("Failed to load privacy settings", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   function handleSave() {
     start(async () => {
@@ -37,6 +69,9 @@ export default function PrivacySettingsPage() {
           data_visibility:       visibility,
           hide_from_leaderboard: hideLeaderboard,
           show_activity:         showActivity,
+        });
+        await updateProfilePreferences({
+          ai_training_opt_in: aiTrainingOptIn,
         });
         toast.success("Privacy settings saved");
       } catch (err: unknown) {
@@ -54,6 +89,14 @@ export default function PrivacySettingsPage() {
         toast.error(err instanceof Error ? err.message : "Export failed");
       }
     });
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-in">
+        {[...Array(3)].map((_, i) => <div key={i} className="skeleton h-24 rounded-xl" />)}
+      </div>
+    );
   }
 
   return (
@@ -122,6 +165,13 @@ export default function PrivacySettingsPage() {
             </div>
           ))}
         </div>
+      </SectionCard>
+
+      {/* AI Privacy */}
+      <SectionCard title="AI Data & Training" description="Control how your data is used for artificial intelligence models">
+        <FieldRow label="Opt-in to AI training" description="Allow VaultX to use your sanitized reports and activity logs to train and improve the AI models">
+          <SettingsToggle checked={aiTrainingOptIn} onChange={setAiTrainingOptIn} />
+        </FieldRow>
       </SectionCard>
 
       {/* Data export */}

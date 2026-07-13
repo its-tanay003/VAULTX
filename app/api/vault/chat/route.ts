@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   const context: VaultContext = body?.context ?? {};
   let conversationId: string | undefined = body?.conversationId;
 
-  const { data: profile } = await supabase.from("profiles").select("role, org_id, vault_agent_mode_enabled").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("role, org_id, vault_agent_mode_enabled, vault_response_style").eq("id", user.id).single();
   const realRole: UserRole = profile?.role ?? "researcher";
   const role: "researcher" | "admin" = realRole === "researcher" ? "researcher" : "admin";
   const orgId = profile?.org_id;
@@ -95,7 +95,8 @@ export async function POST(request: Request) {
     }
   }
 
-  const system = buildSystemPrompt(role, realRole, contextData, agentModeEnabled);
+  const responseStyle = (profile?.vault_response_style as "concise" | "detailed") ?? "concise";
+  const system = buildSystemPrompt(role, realRole, contextData, agentModeEnabled, responseStyle);
 
   const encoder = new TextEncoder();
   let assembled = "";

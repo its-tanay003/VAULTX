@@ -29,6 +29,8 @@ export async function updateProfile(formData: FormData) {
     if (existing) throw new Error("Username already taken");
   }
 
+  const avatarUrl = formData.get("avatar_url") as string;
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -38,11 +40,36 @@ export async function updateProfile(formData: FormData) {
       website:   website || null,
       twitter:   twitter || null,
       github:    github || null,
+      avatar_url: avatarUrl || undefined,
     })
     .eq("id", user.id);
 
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/settings/profile");
+  revalidatePath("/dashboard");
+}
+
+export async function updateProfilePreferences(prefs: {
+  theme_preference?: "light" | "dark" | "system";
+  language?: string;
+  reduced_motion?: boolean;
+  high_contrast?: boolean;
+  vault_response_style?: "concise" | "detailed";
+  ai_training_opt_in?: boolean;
+}) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(prefs)
+    .eq("id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/settings/profile");
+  revalidatePath("/dashboard/settings/privacy");
   revalidatePath("/dashboard");
 }

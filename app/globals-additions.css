@@ -206,3 +206,24 @@ table {
 .vault-chat-md table { border-collapse: collapse; width: 100%; margin: 0.5em 0; font-size: 0.85em; }
 .vault-chat-md th, .vault-chat-md td { border: 1px solid rgba(255,255,255,0.15); padding: 0.3em 0.5em; text-align: left; }
 .vault-chat-md strong { font-weight: 600; }
+
+/* ── Settings preferences: reduced motion ────────────────────────────────── */
+.reduced-motion *,
+html[data-reduced-motion="true"] * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ── Settings preferences: high contrast ──────────────────────────────────── */
+html[data-high-contrast="true"] {
+  --color-vault-text: #ffffff;
+  --color-vault-muted: #a1a1aa;
+  --color-vault-subtle: #d4d4d8;
+  --color-vault-border: #71717a;
+  --color-vault-border-bright: #a1a1aa;
+}
+html[data-high-contrast="true"] body {
+  color: #ffffff;
+}

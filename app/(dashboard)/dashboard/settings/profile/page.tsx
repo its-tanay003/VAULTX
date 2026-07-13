@@ -1,12 +1,10 @@
-"use client";
-
 import { useEffect, useState, useTransition } from "react";
 import { createClient }   from "@/lib/supabase/client";
-import { updateProfile }  from "@/app/actions/profile";
+import { updateProfile, updateProfilePreferences }  from "@/app/actions/profile";
 import { useRouter }      from "next/navigation";
 import { toast }          from "sonner";
 import { Loader2, Save, Globe, Camera } from "lucide-react";
-import { SectionCard } from "@/components/settings/section-card";
+import { SectionCard, FieldRow, SettingsToggle } from "@/components/settings/section-card";
 import type { Metadata } from "next";
 
 export default function ProfileSettingsPage() {
@@ -27,6 +25,13 @@ export default function ProfileSettingsPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
+  // Preference states
+  const [themePreference, setThemePreference] = useState<"light" | "dark" | "system">("system");
+  const [language, setLanguage] = useState("en");
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [highContrast, setHighContrast] = useState(false);
+  const [responseStyle, setResponseStyle] = useState<"concise" | "detailed">("concise");
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -43,11 +48,37 @@ export default function ProfileSettingsPage() {
         setTwitter(data.twitter ?? "");
         setGithub(data.github ?? "");
         setAvatarUrl(data.avatar_url ?? null);
+
+        setThemePreference(data.theme_preference || "system");
+        setLanguage(data.language || "en");
+        setReducedMotion(data.reduced_motion || false);
+        setHighContrast(data.high_contrast || false);
+        setResponseStyle(data.vault_response_style || "concise");
       }
       setLoading(false);
     }
     load();
   }, []);
+
+  async function handlePreferenceChange(key: string, value: any) {
+    try {
+      if (key === "theme_preference") setThemePreference(value);
+      if (key === "language") setLanguage(value);
+      if (key === "reduced_motion") setReducedMotion(value);
+      if (key === "high_contrast") setHighContrast(value);
+      if (key === "vault_response_style") setResponseStyle(value);
+
+      await updateProfilePreferences({ [key]: value });
+      toast.success("Preferences updated");
+
+      // For theme preference, force reload or tell user it requires a refresh
+      if (key === "theme_preference" || key === "reduced_motion" || key === "high_contrast") {
+        router.refresh();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update preference");
+    }
+  }
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -193,6 +224,59 @@ export default function ProfileSettingsPage() {
                 <input value={twitter} onChange={(e) => setTwitter(e.target.value)} className="vault-input pl-8 w-full" placeholder="username" />
               </div>
             </Field>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Preferences */}
+      <SectionCard title="Preferences & Accessibility" description="Customize your interface theme, language, and accessibility options">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-vault-muted">Interface Theme</label>
+              <select
+                value={themePreference}
+                onChange={(e) => handlePreferenceChange("theme_preference", e.target.value)}
+                className="vault-select w-full"
+              >
+                <option value="system">System Default</option>
+                <option value="dark">Dark Theme</option>
+                <option value="light">Light Theme</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5 text-vault-muted">Language</label>
+              <select
+                value={language}
+                onChange={(e) => handlePreferenceChange("language", e.target.value)}
+                className="vault-select w-full"
+              >
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+              </select>
+            </div>
+          </div>
+
+          <FieldRow label="Reduced motion" description="Disable animations and transition effects throughout the platform">
+            <SettingsToggle checked={reducedMotion} onChange={(val) => handlePreferenceChange("reduced_motion", val)} />
+          </FieldRow>
+
+          <FieldRow label="High contrast" description="Increase color contrast of borders and texts for better readability">
+            <SettingsToggle checked={highContrast} onChange={(val) => handlePreferenceChange("high_contrast", val)} />
+          </FieldRow>
+
+          <div>
+            <label className="block text-xs font-medium mb-1.5 text-vault-muted">VAULT AI Response Style</label>
+            <select
+              value={responseStyle}
+              onChange={(e) => handlePreferenceChange("vault_response_style", e.target.value)}
+              className="vault-select w-full"
+            >
+              <option value="concise">Concise & Direct (Brief answers)</option>
+              <option value="detailed">Detailed & Analytical (Full context/explanations)</option>
+            </select>
           </div>
         </div>
       </SectionCard>

@@ -83,13 +83,51 @@ const jsonLd = {
   aggregateRating: undefined, // omit until real ratings exist — never fabricate this field
 };
 
-export default function RootLayout({
+import { createClient } from "@/lib/supabase/server";
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+
+  let themePreference = "system";
+  let language = "en";
+  let reducedMotion = false;
+  let highContrast = false;
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("theme_preference, language, reduced_motion, high_contrast")
+      .eq("id", user.id)
+      .single();
+
+    if (profile) {
+      themePreference = profile.theme_preference || "system";
+      language = profile.language || "en";
+      reducedMotion = profile.reduced_motion || false;
+      highContrast = profile.high_contrast || false;
+    }
+  }
+
+  const htmlClasses = [
+    themePreference === "dark" ? "dark" : themePreference === "light" ? "light" : "",
+    reducedMotion ? "reduced-motion" : "",
+    highContrast ? "high-contrast" : ""
+  ].filter(Boolean).join(" ");
+
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html
+      lang={language}
+      className={htmlClasses}
+      data-theme={themePreference}
+      data-reduced-motion={reducedMotion ? "true" : "false"}
+      data-high-contrast={highContrast ? "true" : "false"}
+      suppressHydrationWarning
+    >
       <head>
         <script
           type="application/ld+json"
@@ -100,7 +138,7 @@ export default function RootLayout({
       <body
         className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased bg-vault-bg text-vault-text min-h-screen`}
       >
-        <ThemeProvider>
+        <ThemeProvider defaultTheme={themePreference}>
           {children}
           <Toaster
             theme="dark"

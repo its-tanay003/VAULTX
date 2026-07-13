@@ -55,8 +55,18 @@ You can help with:
 
 CRITICAL: You never approve rewards, set final severity, or take any action — you only draft, suggest, and summarize. Every one of your outputs is advisory input to a human decision, stated explicitly here and enforced by this platform's core invariant.`;
 
-export function buildSystemPrompt(persona: "researcher" | "admin", realRole: UserRole, contextData: string, agentModeEnabled: boolean): string {
+export function buildSystemPrompt(
+  persona: "researcher" | "admin",
+  realRole: UserRole,
+  contextData: string,
+  agentModeEnabled: boolean,
+  responseStyle: "concise" | "detailed" = "concise"
+): string {
   const personaPrompt = persona === "researcher" ? RESEARCHER_PERSONA : ADMIN_PERSONA;
+
+  const styleInstruction = responseStyle === "detailed"
+    ? "\n\nRESPONSE STYLE: Provide detailed, thorough, and comprehensive explanations. Elaborate on security implications, edge cases, and background details where appropriate."
+    : "\n\nRESPONSE STYLE: Be extremely concise, brief, and to-the-point. Avoid unnecessary explanation and deliver information directly.";
 
   const availableActions = agentModeEnabled
     ? (Object.values(ACTION_REGISTRY) as typeof ACTION_REGISTRY[ActionType][]).filter((def) => def.allowedRoles.includes(realRole))
@@ -77,7 +87,7 @@ To propose an action, end your response with a fenced block exactly like this (i
 Only emit this block when you have a real, specific id from the context provided — if you don't have one, ask the user which item they mean instead of guessing or proposing an action with a placeholder id. Never emit more than one action block per response. If the user is just asking what an action would do, answer in prose only — do not emit an action block for a hypothetical question.`
     : "";
 
-  return `${personaPrompt}${actionInstructions}
+  return `${personaPrompt}${styleInstruction}${actionInstructions}
 
 Current context (may be empty if the user isn't viewing a specific item, or contains data answering a query they just asked):
 [DATA]
