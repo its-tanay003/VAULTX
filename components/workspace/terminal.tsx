@@ -6,6 +6,7 @@ import { runTerminalCommand } from "@/app/actions/workspace";
 
 interface WorkspaceTerminalProps {
   workspaceId: string;
+  onLogsChange?: (logText: string) => void;
 }
 
 interface LogEntry {
@@ -13,7 +14,7 @@ interface LogEntry {
   text: string;
 }
 
-export function WorkspaceTerminal({ workspaceId }: WorkspaceTerminalProps) {
+export function WorkspaceTerminal({ workspaceId, onLogsChange }: WorkspaceTerminalProps) {
   const [logs, setLogs] = useState<LogEntry[]>([
     { type: "system", text: "VAULTX Sandboxed Terminal initialized successfully." },
     { type: "system", text: "Network egress firewall active: Outgoing TCP/UDP ports 22, 25, DB ports blocked." },
@@ -22,6 +23,19 @@ export function WorkspaceTerminal({ workspaceId }: WorkspaceTerminalProps) {
   const [input, setInput] = useState("");
   const [isPending, startTransition] = useTransition();
   const consoleBottomRef = useRef<HTMLDivElement>(null);
+
+  // Propagate log string to parent for AI debugger context
+  useEffect(() => {
+    if (onLogsChange) {
+      const fullLogText = logs
+        .map((entry) => {
+          if (entry.type === "input") return `~$ ${entry.text}`;
+          return entry.text;
+        })
+        .join("\n");
+      onLogsChange(fullLogText);
+    }
+  }, [logs, onLogsChange]);
 
   // Scroll to bottom on log updates
   useEffect(() => {

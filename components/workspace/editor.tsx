@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useRef, useTransition } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import {
   Folder, File, ChevronRight, ChevronDown, Save, GitCommit,
   Pause, Trash2, Loader2, Plus, FilePlus, FolderPlus,
-  X, Edit2
+  X, Edit2, Sparkles, Terminal as TerminalIcon, AlertCircle, FileCode, HelpCircle
 } from "lucide-react";
 import {
   getWorkspaceFiles, getWorkspaceFileContent, saveWorkspaceFile,
   commitAndPushWorkspace, suspendWorkspace, destroyWorkspace,
   createWorkspaceFile, createWorkspaceFolder, deleteWorkspacePath, renameWorkspacePath
 } from "@/app/actions/workspace";
+import {
+  getInlineSuggestion,
+  generateCodeInWorkspace,
+  assistDebugging
+} from "@/app/actions/ai-editor";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { WorkspaceTerminal } from "./terminal";
@@ -30,9 +35,13 @@ interface WorkspaceEditorProps {
 
 export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps) {
   const router = useRouter();
+  const editorRef = useRef<any>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(true);
+
+  // Sidebar Tab Switcher
+  const [sidebarTab, setSidebarTab] = useState<"files" | "ai">("files");
 
   // Multi-file tabs state
   const [openFiles, setOpenFiles] = useState<string[]>([]);
@@ -53,10 +62,26 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
   const [newItemName, setNewItemName] = useState("");
   const [renamePrompt, setRenamePrompt] = useState<{ path: string; oldName: string } | null>(null);
 
+  // AI Assistant States
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiTargetPath, setAiTargetPath] = useState("");
+  const [isGeneratingCode, startGeneratingCode] = useTransition();
+
+  // Debugger assistance states
+  const [lastTerminalOutput, setLastTerminalOutput] = useState("");
+  const [debugResult, setDebugResult] = useState<{
+    explanation: string;
+    suggestedFix: string;
+    fileToModify: string;
+  } | null>(null);
+  const [isDebugging, startDebugging] = useTransition();
+
   const [isSaving, startSave] = useTransition();
   const [isCommitting, startCommit] = useTransition();
   const [isSuspending, startSuspend] = useTransition();
   const [isDestroying, startDestroy] = useTransition();
+
+  const [isInlineCompleting, setIsInlineCompleting] = useState(false);
 
   // Helper: build nested tree
   function buildTree(paths: string[]): TreeNode[] {
@@ -117,6 +142,7 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
 
   useEffect(() => {
     refreshFiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
 
   // Open a file and add it to open tabs list
@@ -273,6 +299,76 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
         toast.error(err.message || "Failed to commit and push changes");
       }
     });
+  }
+
+  // AI Code Generation
+  function handleGenerateCode() {
+    if (!aiPrompt.trim() || !aiTargetPath.trim()) return;
+    startGeneratingCode(async () => {
+      try {
+        await generateCodeInWorkspace(workspaceId, aiPrompt, aiTargetPath);
+        toast.success(`AI successfully generated code for ${aiTargetPath}`);
+        setAiPrompt("");
+        refreshFiles(aiTargetPath);
+      } catch (err) {
+        toast.error("Failed to generate code with AI");
+      }
+    });
+  }
+
+  // AI Debugger
+  function handleDebugLastCrash() {
+    if (!lastTerminalOutput) {
+      toast.error("Terminal console logs are empty. Run a command first!");
+      return;
+    }
+    startDebugging(async () => {
+      try {
+        const res = await assistDebugging(workspaceId, lastTerminalOutput, "");
+        setDebugResult(res);
+      } catch (err) {
+        toast.error("AI debugger failed to analyze logs");
+      }
+    });
+  }
+
+  // Low-latency inline suggestions trigger
+  async function triggerInlineSuggestion() {
+    if (!activeFile || !editorRef.current) return;
+    setIsInlineCompleting(true);
+
+    try {
+      const model = editorRef.current.getModel();
+      const position = editorRef.current.getPosition();
+      const value = model.getValue();
+      const offset = model.getOffsetAt(position);
+      const prefix = value.substring(0, offset);
+      const suffix = value.substring(offset);
+
+      const suggestion = await getInlineSuggestion(activeFile, prefix, suffix);
+      if (suggestion) {
+        // Insert suggestion at cursor
+        editorRef.current.executeEdits("ai-completion", [
+          {
+            range: {
+              startLineNumber: position.lineNumber,
+              startColumn: position.column,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column,
+            },
+            text: suggestion,
+            forceMoveMarkers: true,
+          },
+        ]);
+        toast.success("AI suggestion inserted");
+      } else {
+        toast.error("No suggestion returned");
+      }
+    } catch (err) {
+      toast.error("Completion error");
+    } finally {
+      setIsInlineCompleting(false);
+    }
   }
 
   // Suspend VM session
@@ -449,69 +545,216 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
 
       {/* Main split view */}
       <div className="flex-1 flex min-h-0">
-        {/* Sidebar File Tree */}
-        <div className="w-64 border-r border-vault-border bg-vault-bg p-4 overflow-y-auto shrink-0 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <span className="text-[10px] uppercase font-bold text-vault-muted tracking-wider">Workspace Files</span>
-            <div className="flex items-center gap-1.5">
-              <button
-                title="New File at Root"
-                onClick={() => setShowCreatePrompt({ isDir: false })}
-                className="p-1 rounded hover:bg-vault-elevated text-vault-muted hover:text-vault-teal transition-colors"
-              >
-                <FilePlus className="w-3.5 h-3.5" />
-              </button>
-              <button
-                title="New Folder at Root"
-                onClick={() => setShowCreatePrompt({ isDir: true })}
-                className="p-1 rounded hover:bg-vault-elevated text-vault-muted hover:text-vault-teal transition-colors"
-              >
-                <FolderPlus className="w-3.5 h-3.5" />
-              </button>
-            </div>
+        {/* Left Side Sidebar - Tabs for Files and AI */}
+        <div className="w-72 border-r border-vault-border bg-vault-bg flex flex-col shrink-0 min-h-0">
+          {/* Tab Selection */}
+          <div className="grid grid-cols-2 border-b border-vault-border shrink-0 h-9 bg-vault-surface">
+            <button
+              onClick={() => setSidebarTab("files")}
+              className={`text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2 flex items-center justify-center gap-1.5 ${
+                sidebarTab === "files"
+                  ? "border-vault-teal text-vault-text"
+                  : "border-transparent text-vault-muted hover:text-vault-text"
+              }`}
+            >
+              <File className="w-3.5 h-3.5" /> Files
+            </button>
+            <button
+              onClick={() => setSidebarTab("ai")}
+              className={`text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2 flex items-center justify-center gap-1.5 ${
+                sidebarTab === "ai"
+                  ? "border-vault-teal text-vault-text"
+                  : "border-transparent text-vault-muted hover:text-vault-text"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-vault-teal" /> AI Agent
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0 space-y-1">
-            {loadingFiles ? (
-              <div className="flex flex-col items-center justify-center py-12 space-y-2">
-                <Loader2 className="w-5 h-5 animate-spin text-vault-teal" />
-                <span className="text-[10px] text-vault-muted">Loading workspace...</span>
+          {/* Files Explorer Panel */}
+          {sidebarTab === "files" ? (
+            <div className="flex-1 p-4 overflow-y-auto min-h-0 flex flex-col space-y-2">
+              <div className="flex items-center justify-between mb-2 shrink-0">
+                <span className="text-[10px] uppercase font-bold text-vault-muted tracking-wider">Explorer</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    title="New File at Root"
+                    onClick={() => setShowCreatePrompt({ isDir: false })}
+                    className="p-1 rounded hover:bg-vault-elevated text-vault-muted hover:text-vault-teal transition-colors"
+                  >
+                    <FilePlus className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    title="New Folder at Root"
+                    onClick={() => setShowCreatePrompt({ isDir: true })}
+                    className="p-1 rounded hover:bg-vault-elevated text-vault-muted hover:text-vault-teal transition-colors"
+                  >
+                    <FolderPlus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            ) : (
-              tree.map((node) => renderTreeNode(node))
-            )}
-          </div>
+
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-1">
+                {loadingFiles ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                    <Loader2 className="w-5 h-5 animate-spin text-vault-teal" />
+                    <span className="text-[10px] text-vault-muted">Loading files...</span>
+                  </div>
+                ) : (
+                  tree.map((node) => renderTreeNode(node))
+                )}
+              </div>
+            </div>
+          ) : (
+            // AI Assistant Tab Panel
+            <div className="flex-1 p-4 overflow-y-auto min-h-0 space-y-5">
+              {/* AI Code Generator */}
+              <div className="space-y-3">
+                <span className="text-[10px] uppercase font-bold text-vault-muted tracking-wider flex items-center gap-1">
+                  <FileCode className="w-3.5 h-3.5 text-vault-teal" /> AI Code Generator
+                </span>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={aiTargetPath}
+                    onChange={(e) => setAiTargetPath(e.target.value)}
+                    className="vault-input w-full text-xs p-2.5 placeholder-zinc-600"
+                    placeholder="Target file path (e.g. src/utils.js)"
+                  />
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    className="vault-input w-full min-h-[90px] text-xs p-2.5 placeholder-zinc-600"
+                    placeholder="Explain what the AI should write or edit inside the file..."
+                  />
+                  <button
+                    onClick={handleGenerateCode}
+                    disabled={isGeneratingCode || !aiPrompt.trim() || !aiTargetPath.trim()}
+                    className="btn-primary text-xs w-full py-2 flex items-center justify-center gap-1.5"
+                  >
+                    {isGeneratingCode ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Code...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" /> Generate & Write File
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-px bg-vault-border" />
+
+              {/* AI Debugging Panel */}
+              <div className="space-y-3">
+                <span className="text-[10px] uppercase font-bold text-vault-muted tracking-wider flex items-center gap-1">
+                  <TerminalIcon className="w-3.5 h-3.5 text-vault-teal" /> AI Debugging Companion
+                </span>
+                <div className="space-y-2">
+                  <p className="text-[11px] text-vault-muted">
+                    Analyzes current sandboxed terminal crash logs and proposes clean fixes.
+                  </p>
+                  <button
+                    onClick={handleDebugLastCrash}
+                    disabled={isDebugging}
+                    className="btn-ghost text-xs w-full py-2 flex items-center justify-center gap-1.5"
+                  >
+                    {isDebugging ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Analyzing Logs...
+                      </>
+                    ) : (
+                      <>
+                        <HelpCircle className="w-3.5 h-3.5" /> Debug Terminal Output
+                      </>
+                    )}
+                  </button>
+
+                  {debugResult && (
+                    <div className="bg-zinc-900 border border-vault-border rounded-xl p-3 space-y-2.5 animate-in text-[11px]">
+                      <div>
+                        <span className="font-bold text-zinc-400 block mb-0.5">EXPLANATION</span>
+                        <p className="text-zinc-300 leading-relaxed">{debugResult.explanation}</p>
+                      </div>
+
+                      {debugResult.fileToModify && (
+                        <div>
+                          <span className="font-bold text-zinc-400 block mb-0.5">FILE TO MODIFY</span>
+                          <button
+                            onClick={() => handleOpenFile(debugResult.fileToModify)}
+                            className="text-vault-teal font-semibold hover:underline flex items-center gap-1 break-all"
+                          >
+                            <File className="w-3.5 h-3.5 shrink-0" />
+                            {debugResult.fileToModify}
+                          </button>
+                        </div>
+                      )}
+
+                      {debugResult.suggestedFix && (
+                        <div>
+                          <span className="font-bold text-zinc-400 block mb-0.5">SUGGESTED CHANGES</span>
+                          <pre className="bg-black p-2 rounded text-[10px] text-zinc-400 overflow-x-auto whitespace-pre-wrap leading-tight">
+                            {debugResult.suggestedFix}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Monaco Editor & Terminal Container */}
         <div className="flex-1 flex flex-col min-w-0 bg-zinc-950">
           {/* Open Tabs Headers */}
-          <div className="flex items-center bg-zinc-900 border-b border-vault-border overflow-x-auto shrink-0 scrollbar-none h-9">
-            {openFiles.map((path) => {
-              const isActive = activeFile === path;
-              const hasUnsaved = path in dirtyCache;
-              return (
-                <div
-                  key={path}
-                  onClick={() => handleOpenFile(path)}
-                  className={`flex items-center gap-2 px-4 h-full border-r border-vault-border text-xs cursor-pointer select-none transition-colors ${
-                    isActive
-                      ? "bg-zinc-950 text-vault-teal font-semibold border-t-2 border-t-vault-teal"
-                      : "text-zinc-400 hover:bg-zinc-950/50 hover:text-zinc-200"
-                  }`}
-                >
-                  <File className="w-3.5 h-3.5 opacity-60" />
-                  <span className="truncate max-w-[120px]">{path.split("/").pop()}</span>
-                  {hasUnsaved && <span className="w-1.5 h-1.5 rounded-full bg-vault-teal shrink-0" />}
-                  <button
-                    onClick={(e) => handleCloseFile(path, e)}
-                    className="p-0.5 rounded-full hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors"
+          <div className="flex items-center justify-between bg-zinc-900 border-b border-vault-border shrink-0 h-9 px-2">
+            <div className="flex items-center overflow-x-auto scrollbar-none h-full flex-1">
+              {openFiles.map((path) => {
+                const isActive = activeFile === path;
+                const hasUnsaved = path in dirtyCache;
+                return (
+                  <div
+                    key={path}
+                    onClick={() => handleOpenFile(path)}
+                    className={`flex items-center gap-2 px-4 h-full border-r border-vault-border text-xs cursor-pointer select-none transition-colors shrink-0 ${
+                      isActive
+                        ? "bg-zinc-950 text-vault-teal font-semibold border-t-2 border-t-vault-teal"
+                        : "text-zinc-400 hover:bg-zinc-950/50 hover:text-zinc-200"
+                    }`}
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
+                    <File className="w-3.5 h-3.5 opacity-60" />
+                    <span className="truncate max-w-[120px]">{path.split("/").pop()}</span>
+                    {hasUnsaved && <span className="w-1.5 h-1.5 rounded-full bg-vault-teal shrink-0" />}
+                    <button
+                      onClick={(e) => handleCloseFile(path, e)}
+                      className="p-0.5 rounded-full hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Monaco Helper Actions (Inline Completion shortcut) */}
+            {activeFile && (
+              <button
+                onClick={triggerInlineSuggestion}
+                disabled={isInlineCompleting}
+                className="btn-ghost py-1 text-[10px] font-semibold flex items-center gap-1.5 text-vault-teal hover:bg-vault-teal/5 bg-vault-teal/5 border border-vault-teal/20 rounded mr-2"
+              >
+                {isInlineCompleting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                AI Autocomplete
+              </button>
+            )}
           </div>
 
           {/* Monaco Frame */}
@@ -528,6 +771,9 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
                 theme="vs-dark"
                 path={activeFile}
                 value={fileContent}
+                onMount={(editor) => {
+                  editorRef.current = editor;
+                }}
                 onChange={(val) => {
                   setFileContent(val || "");
                   setIsDirty(true);
@@ -554,7 +800,10 @@ export function WorkspaceEditor({ workspaceId, repoName }: WorkspaceEditorProps)
 
           {/* Terminal Console */}
           <div className="h-72 shrink-0">
-            <WorkspaceTerminal workspaceId={workspaceId} />
+            <WorkspaceTerminal
+              workspaceId={workspaceId}
+              onLogsChange={(logText) => setLastTerminalOutput(logText)}
+            />
           </div>
         </div>
       </div>
