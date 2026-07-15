@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { ChevronDown, ChevronUp, Check, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -129,7 +129,7 @@ export function FeatureComparison({ currentTier = "free" }: FeatureComparisonPro
             </thead>
             <tbody className="divide-y divide-vault-border/40">
               {COMPARISON_DATA.map((section) => (
-                <div key={section.category} className="contents">
+                <Fragment key={section.category}>
                   <tr className="bg-vault-bg/50">
                     <td
                       colSpan={5}
@@ -176,7 +176,7 @@ export function FeatureComparison({ currentTier = "free" }: FeatureComparisonPro
                       </td>
                     </tr>
                   ))}
-                </div>
+                </Fragment>
               ))}
             </tbody>
           </table>
