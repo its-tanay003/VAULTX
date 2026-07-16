@@ -11,13 +11,18 @@ An AI-first, zero-infrastructure-cost cybersecurity and code intelligence platfo
 
 ## ✨ Features
 
+- **E2B Sandboxed IDE Workspace**: Boots secure VM containers running terminal tasks, file editor, and git actions directly inside the browser.
+- **Real-Time Collaboration**: Bidirectional multi-user editing powered by conflict-free replicated data types (Yjs) and Supabase Broadcast channels.
+- **7-Tier RBAC Hierarchy**: Complete ordered enum-based access control (`guest`, `researcher`, `triager`, `developer`, `maintainer`, `org_owner`, `system_admin`) for high-security isolation.
+- **AI-Powered Code Intelligence**: Contextual multi-file generation, low-latency inline autocomplete suggestions, and terminal output debugging.
 - **Unified Security Triage**: Ingests open bug bounty and VDP submissions, runs automatic multi-engine deduplication, assesses severity, and displays findings.
 - **Code Auditing (Web2 & Web3)**: Scans public/private GitHub repositories for OWASP Top 10 vulnerabilities, code quality smells, and Solidity gas/reentrancy patterns.
-- **PTaaS Lifecycle Management**: Schedules time-boxed pentests, generates test plans, tracks finding states, and compiles executive summaries with content-integrity signed PDF exports.
+- **PTaaS Lifecycle Management**: Schedules pentests, generates plans, tracks finding states, and compiles executive summaries with content-integrity signed PDF exports.
 - **Autonomous AI Red Teaming**: Simulates threat actors against a repository or scope description with reasoning logs and findings fed directly to the triage queue.
 - **Capture The Flag (CTF)**: Jeopardy-style challenge boards with dynamic decay scores and hashed verification.
 - **Audit Contests**: Code4rena-Style audit contests with pool payouts, auditor submission dashboards, and semantic duplicate pre-grouping.
-- **AI Agent Mode (VAULT)**: floating assistant, consent-gated, context-aware streaming assistant able to execute scans, triage responses, and request details.
+- **AI Agent Mode (VAULT)**: Consent-gated, context-aware streaming assistant able to execute scans, triage responses, and request details.
+- **Advanced User Settings**: Preference controls for theme selection, language preferences, reduced motion, high contrast, active sessions management, and data exports.
 
 ---
 
