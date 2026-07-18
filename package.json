@@ -70,7 +70,7 @@
     "eslint-config-next": "14.2.5",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
-    "postcss": "^8.4.38",
+    "postcss": "^8.5.19",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.5.3",
     "vitest": "^4.1.10",
