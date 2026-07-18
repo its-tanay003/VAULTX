@@ -54,6 +54,7 @@ values (
 on conflict (id) do nothing;
 
 -- RLS for storage: researchers can upload to their own folder
+drop policy if exists "Researchers can upload attachments" on storage.objects;
 create policy "Researchers can upload attachments"
   on storage.objects for insert
   with check (
@@ -61,6 +62,7 @@ create policy "Researchers can upload attachments"
     and auth.uid()::text = (string_to_array(storage.objects.name, '/'))[1]
   );
 
+drop policy if exists "Submission owners and org can read attachments" on storage.objects;
 create policy "Submission owners and org can read attachments"
   on storage.objects for select
   using (

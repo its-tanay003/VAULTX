@@ -17,6 +17,14 @@ create extension if not exists "uuid-ossp";
 create extension if not exists "pg_trgm";    -- fuzzy text search (duplicate detection stage 2)
 create extension if not exists "pgcrypto";   -- gen_random_uuid, pgp_sym_encrypt
 
+-- Fallback to map uuid_generate_v4 to gen_random_uuid in public schema
+CREATE OR REPLACE FUNCTION public.uuid_generate_v4()
+RETURNS uuid AS $$
+BEGIN
+  RETURN gen_random_uuid();
+END;
+$$ LANGUAGE plpgsql;
+
 -- ── Enums ─────────────────────────────────────────────────────────────────────
 do $$
 begin
