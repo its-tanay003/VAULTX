@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getAuthedUser } from "@/lib/supabase/auth";
 
 export interface ActiveSession {
   id: string;
@@ -11,13 +12,6 @@ export interface ActiveSession {
   user_agent: string;
   last_seen: string;
   is_current: boolean;
-}
-
-async function getAuthedUser() {
-  const supabase = createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) redirect("/login");
-  return { supabase, user };
 }
 
 /**
