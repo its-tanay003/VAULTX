@@ -6,6 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "tsx src/cli.ts",
+    "example": "tsx src/example.ts",
     "dev": "tsx watch src/cli.ts",
     "screenshots": "tsx src/screenshot-demos.ts"
   },
@@ -15,6 +16,7 @@
   "type": "module",
   "dependencies": {
     "@openrouter/agent": "^0.4.0",
+    "@openrouter/sdk": "^1.2.47",
     "glob": "^13.0.6",
     "zod": "^4.3.6"
   },

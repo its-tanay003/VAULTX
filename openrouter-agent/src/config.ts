@@ -60,6 +60,27 @@ const DEFAULTS: AgentConfig = {
 export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipApiKey?: boolean }): AgentConfig {
   let config = { ...DEFAULTS };
 
+  const envPath = resolve('.env');
+  if (existsSync(envPath)) {
+    try {
+      const envContent = readFileSync(envPath, 'utf-8');
+      for (const line of envContent.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx !== -1) {
+          const key = trimmed.slice(0, eqIdx).trim();
+          const value = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const configPath = resolve('agent.config.json');
   if (existsSync(configPath)) {
     const file = JSON.parse(readFileSync(configPath, 'utf-8'));
