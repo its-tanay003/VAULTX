@@ -2,4 +2,7 @@ node_modules/
 dist/
 .sessions/
 .env
+.env.*
+*.log
 pnpm-lock.yaml
+

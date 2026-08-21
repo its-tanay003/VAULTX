@@ -1,6 +1,8 @@
 import { tool } from '@openrouter/agent/tool';
 import { z } from 'zod';
 import { readFile } from 'fs/promises';
+import { validatePath, sanitizeError } from './utils/path-validator.js';
+import { checkRateLimit } from './utils/rate-limiter.js';
 
 const DEFAULT_LINE_LIMIT = 2000;
 const MAX_LINE_CHARS = 2000;
@@ -8,15 +10,20 @@ const MAX_LINE_CHARS = 2000;
 export const fileReadTool = tool({
   name: 'file_read',
   description:
-    'Read the contents of a file. Output is capped at 2000 lines by default (use offset/limit to paginate) and any line longer than 2000 characters is truncated. When the response is truncated, the hint field tells you how to continue.',
+    'Read the contents of a file within the workspace. Output is capped at 2000 lines by default (use offset/limit to paginate) and any line longer than 2000 characters is truncated. When the response is truncated, the hint field tells you how to continue.',
   inputSchema: z.object({
-    path: z.string().describe('Absolute path to the file'),
+    path: z.string().describe('Path to the file relative to the workspace'),
     offset: z.number().optional().describe('Start reading from this line (1-indexed)'),
     limit: z.number().optional().describe(`Maximum lines to return (default ${DEFAULT_LINE_LIMIT})`),
   }),
   execute: async ({ path, offset, limit }) => {
     try {
-      const content = await readFile(path, 'utf-8');
+      if (!checkRateLimit('file_read', 120)) {
+        return { error: 'Rate limit exceeded: Too many file read operations.' };
+      }
+
+      const safePath = validatePath(path);
+      const content = await readFile(safePath, 'utf-8');
       const lines = content.split('\n');
 
       const start = offset ? offset - 1 : 0;
@@ -45,7 +52,7 @@ export const fileReadTool = tool({
     } catch (err: any) {
       if (err.code === 'ENOENT') return { error: `File not found: ${path}` };
       if (err.code === 'EACCES') return { error: `Permission denied: ${path}` };
-      return { error: err.message };
+      return { error: sanitizeError(err, 'Failed to read file.') };
     }
   },
 });

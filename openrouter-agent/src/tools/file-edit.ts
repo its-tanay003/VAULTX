@@ -1,20 +1,27 @@
 import { tool } from '@openrouter/agent/tool';
 import { z } from 'zod';
 import { readFile, writeFile } from 'fs/promises';
+import { validatePath, sanitizeError } from './utils/path-validator.js';
+import { checkRateLimit } from './utils/rate-limiter.js';
 
 export const fileEditTool = tool({
   name: 'file_edit',
-  description: 'Apply search-and-replace edits to a file',
+  description: 'Apply search-and-replace edits to a file within the workspace',
   inputSchema: z.object({
-    path: z.string().describe('Absolute path to the file'),
+    path: z.string().describe('Path to the file relative to the workspace'),
     edits: z.array(z.object({
-      old_text: z.string().describe('Text to find (must appear exactly once)'),
-      new_text: z.string().describe('Replacement text'),
-    })),
+      old_text: z.string().max(500000, 'old_text is too large').describe('Text to find (must appear exactly once)'),
+      new_text: z.string().max(500000, 'new_text is too large').describe('Replacement text'),
+    })).max(50, 'Too many edit operations in a single call'),
   }),
   execute: async ({ path, edits }) => {
     try {
-      let content = await readFile(path, 'utf-8');
+      if (!checkRateLimit('file_edit', 60)) {
+        return { error: 'Rate limit exceeded: Too many file edit operations.' };
+      }
+
+      const safePath = validatePath(path);
+      let content = await readFile(safePath, 'utf-8');
       const original = content;
 
       for (const edit of edits) {
@@ -24,7 +31,7 @@ export const fileEditTool = tool({
         content = content.replace(edit.old_text, edit.new_text);
       }
 
-      await writeFile(path, content, 'utf-8');
+      await writeFile(safePath, content, 'utf-8');
 
       const oldLines = original.split('\n');
       const newLines = content.split('\n');
@@ -40,7 +47,7 @@ export const fileEditTool = tool({
 
       return { edited: true, path, diff: diff.join('\n') };
     } catch (err: any) {
-      return { error: err.message };
+      return { error: sanitizeError(err, 'Failed to edit file.') };
     }
   },
 });
