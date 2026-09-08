@@ -4,11 +4,11 @@ import { createClient } from "@supabase/supabase-js";
 
 // Initialize Supabase Client with service role to bypass RLS for processing webhooks
 const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key"
 );
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "dummy_key", {
   apiVersion: "2024-06-20",
 });
 

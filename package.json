@@ -21,6 +21,10 @@
     "check-bundle-size": "node scripts/check-bundle-size.js",
     "deploy": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && opennextjs-cloudflare deploy",
     "preview": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && opennextjs-cloudflare preview",
+    "docker:build": "docker build -t vaultx .",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up",
     "prepare": "husky"
   },
   "dependencies": {
