@@ -4,7 +4,7 @@
  * VAULT Copilot — Connectivity React Context Provider
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { checkActiveConnectivity } from "./connectivity";
 
 export interface ConnectivityState {
@@ -60,8 +60,13 @@ export function OnlineStatusProvider({ children }: { children: React.ReactNode }
     };
   }, [recheckNow]);
 
+  const value = useMemo(
+    () => ({ isOnline, lastCheckedAt, recheckNow }),
+    [isOnline, lastCheckedAt, recheckNow]
+  );
+
   return (
-    <ConnectivityContext.Provider value={{ isOnline, lastCheckedAt, recheckNow }}>
+    <ConnectivityContext.Provider value={value}>
       {children}
     </ConnectivityContext.Provider>
   );

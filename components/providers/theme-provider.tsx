@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { OnlineStatusProvider } from "@/lib/agent/connectivity-context";
 
 /**
  * VAULTX is a dark-first security platform.
- * Also encapsulates OnlineStatusProvider and Service Worker registration.
  */
 export function ThemeProvider({
   children,
@@ -15,14 +13,6 @@ export function ThemeProvider({
   children: React.ReactNode;
   defaultTheme?: string;
 }) {
-  useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator && process.env.NODE_ENV === "production") {
-      navigator.serviceWorker.register("/sw.js").catch((err) => {
-        console.warn("ServiceWorker registration failed:", err);
-      });
-    }
-  }, []);
-
   return (
     <OnlineStatusProvider>
       <NextThemesProvider
