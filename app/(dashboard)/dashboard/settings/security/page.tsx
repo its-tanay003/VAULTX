@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useTransition, useEffect } from "react";
 import { toast }           from "sonner";
 import { Loader2, Lock, Shield, Monitor, Eye, EyeOff, QrCode } from "lucide-react";
