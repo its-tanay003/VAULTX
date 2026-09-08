@@ -5,6 +5,8 @@ import {
   type VaultContext,
 } from "@/lib/ai/vault-agent";
 import { validateProposedAction } from "@/lib/ai/vault-actions";
+import { authorizeToolCall } from "@/lib/agent/authorize";
+import { type UserRbacRole } from "@/lib/agent/capability-registry";
 import { validateCsrf } from "@/lib/api/csrf";
 import type { UserRole } from "@/lib/supabase/types";
 
@@ -14,11 +16,9 @@ export const runtime = "nodejs";
  * POST /api/vault/chat
  *
  * Body: { message: string, conversationId?: string, context?: VaultContext }
- * Streams the assistant's response as plain text chunks (not SSE
- * framing — this is a same-origin fetch consumed by our own widget,
- * so raw chunked text is simpler and sufficient). Persists both the
- * user message and the full assembled response once the stream
- * completes.
+ * Streams the assistant's response as plain text chunks. Persists both the
+ * user message and the full assembled response once the stream completes.
+ * Upgraded with 7-tier RBAC validation and zero-cost behavioral personalization.
  */
 export async function POST(request: Request) {
   const csrfError = validateCsrf(request);
@@ -33,9 +33,15 @@ export async function POST(request: Request) {
   const context: VaultContext = body?.context ?? {};
   let conversationId: string | undefined = body?.conversationId;
 
-  const { data: profile } = await supabase.from("profiles").select("role, org_id, vault_agent_mode_enabled, vault_response_style").eq("id", user.id).single();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, rbac_role, org_id, vault_agent_mode_enabled, vault_response_style, ai_personalization_opt_in")
+    .eq("id", user.id)
+    .single();
+
   const realRole: UserRole = profile?.role ?? "researcher";
-  const role: "researcher" | "admin" = realRole === "researcher" ? "researcher" : "admin";
+  const rbacRole: UserRbacRole = profile?.rbac_role ?? (realRole === "admin" ? "system_admin" : realRole === "org" ? "org_owner" : realRole);
+  const role: "researcher" | "admin" = (rbacRole === "org_owner" || rbacRole === "system_admin" || rbacRole === "maintainer" || rbacRole === "triager") ? "admin" : "researcher";
   const orgId = profile?.org_id;
 
   // 1. Quota Check: enforce monthly AI requests
@@ -95,8 +101,23 @@ export async function POST(request: Request) {
     }
   }
 
+  // 3. Retrieve Personalization Profile Summary
+  let personalizationSummary: string | undefined;
+  if (profile?.ai_personalization_opt_in !== false) {
+    const { data: userProfile } = await supabase
+      .from("personalization_profiles")
+      .select("top_capabilities")
+      .eq("user_id", user.id)
+      .single();
+
+    if (userProfile?.top_capabilities && Array.isArray(userProfile.top_capabilities) && userProfile.top_capabilities.length > 0) {
+      const capNames = userProfile.top_capabilities.map((c: any) => c.key).join(", ");
+      personalizationSummary = `User frequently uses: ${capNames}`;
+    }
+  }
+
   const responseStyle = (profile?.vault_response_style as "concise" | "detailed") ?? "concise";
-  const system = buildSystemPrompt(role, realRole, contextData, agentModeEnabled, responseStyle);
+  const system = buildSystemPrompt(role, realRole, contextData, agentModeEnabled, responseStyle, personalizationSummary);
 
   const encoder = new TextEncoder();
   let assembled = "";
@@ -107,14 +128,6 @@ export async function POST(request: Request) {
       try {
         for await (const chunk of streamClaude({ system, user: message, history, maxTokens: 800, temperature: 0.4 })) {
           assembled += chunk;
-          // Stop forwarding to the client the moment the action fence
-          // begins — without this, the raw ```vault-action JSON block
-          // would flash visibly in the chat before end-of-stream
-          // stripping ever runs. A few characters right at the fence
-          // boundary might render for one chunk in the rare case the
-          // fence marker splits across two chunks; that's a much
-          // smaller cosmetic risk than showing the whole JSON block,
-          // and is an accepted tradeoff rather than an oversight.
           if (!fenceStarted && assembled.includes("```vault-action")) {
             fenceStarted = true;
             const idx = assembled.indexOf("```vault-action");
@@ -134,9 +147,6 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`\n\n[VAULT is temporarily unavailable: ${msg}]`));
       } finally {
         if (assembled) {
-          // Strip any action block from what gets stored/shown as the
-          // assistant's text — it's rendered as a separate Action
-          // Preview card client-side, not as raw JSON in the transcript.
           const actionMatch = assembled.match(/```vault-action\s*([\s\S]*?)```/);
           const textOnly = assembled.replace(/```vault-action\s*[\s\S]*?```/, "").trim();
 
@@ -147,28 +157,49 @@ export async function POST(request: Request) {
             try {
               const parsed = JSON.parse(actionMatch[1]);
               const validated = validateProposedAction(realRole, parsed.type, parsed.params ?? {});
-              if (validated) {
+
+              // Strict 7-Tier RBAC check through central authorization chokepoint
+              const auth = authorizeToolCall({
+                userId: user.id,
+                orgId,
+                role: rbacRole,
+                capabilityKey: parsed.type.startsWith("action.") ? parsed.type : `action.${parsed.type}`,
+                params: parsed.params ?? {},
+              });
+
+              if (validated && auth.allowed) {
                 const { data: actionRow } = await supabase
                   .from("vault_actions")
                   .insert({
-                    conversation_id: conversationId, user_id: user.id,
-                    action_type: validated.type, params: validated.params, summary: validated.summary,
+                    conversation_id: conversationId,
+                    user_id: user.id,
+                    action_type: validated.type,
+                    params: validated.params,
+                    summary: validated.summary,
                     status: "proposed",
                   })
                   .select("id").single();
 
                 if (actionRow) {
                   controller.enqueue(encoder.encode(`\n\n__VAULT_ACTION__${JSON.stringify({
-                    id: actionRow.id, type: validated.type, params: validated.params, summary: validated.summary,
+                    id: actionRow.id,
+                    type: validated.type,
+                    params: validated.params,
+                    summary: validated.summary,
                   })}`));
                 }
+              } else if (!auth.allowed) {
+                // Log unauthorized proposal attempt to audit log
+                await supabase.from("audit_logs").insert({
+                  actor_id: user.id,
+                  action: "vault_agent.proposal_denied",
+                  entity: "vault_actions",
+                  entity_id: conversationId,
+                  after: { reason: auth.reason, message: auth.message, attemptedType: parsed.type, rbacRole },
+                });
               }
-              // If validation failed (bad role, missing param, unknown
-              // type), we silently drop it per the design doc §6.2 —
-              // the user already saw the text-only response above,
-              // nothing malformed reaches them.
             } catch {
-              // Malformed JSON in the action block — same silent drop.
+              // Malformed JSON in the action block — silent drop
             }
           }
 

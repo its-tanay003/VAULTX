@@ -1,18 +1,36 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Sparkles, X, Send, Loader2, Plus, History } from "lucide-react";
+import {
+  Sparkles,
+  X,
+  Send,
+  Loader2,
+  Plus,
+  History,
+  WifiOff,
+  RefreshCw,
+  ArrowRight,
+} from "lucide-react";
 import { useVaultContext } from "./vault-context";
 import { listVaultConversations, loadVaultConversation } from "@/app/actions/vault";
 import { VaultActionCard, type ProposedAction } from "./vault-action-card";
+import { useOnlineStatus } from "@/lib/agent/connectivity-context";
+import { initializeOfflineCache, offlineDb } from "@/lib/agent/offline-db";
+import { matchOfflineQuery } from "@/lib/agent/offline-matcher";
+import { syncPendingActions, getPendingActionCount } from "@/lib/agent/sync-queue";
+import { trackBehaviorEvent } from "@/lib/agent/track";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   action?: ProposedAction;
+  isOffline?: boolean;
+  targetRoute?: string;
 }
 
 const RESEARCHER_QUICK_ACTIONS = [
@@ -28,6 +46,8 @@ const ADMIN_QUICK_ACTIONS = [
 ];
 
 export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
+  const router = useRouter();
+  const { isOnline } = useOnlineStatus();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -35,17 +55,49 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<{ id: string; title: string | null; updated_at: string }[]>([]);
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const context = useVaultContext();
+
+  // Initialize offline caches on mount
+  useEffect(() => {
+    initializeOfflineCache().catch(console.warn);
+    getPendingActionCount().then(setPendingSyncCount).catch(console.warn);
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // Lets the command palette (or any other part of the app) open VAULT
-  // and optionally send a pre-filled message, without needing a shared
-  // React context just for this — a small, deliberate decoupling rather
-  // than a bigger state-management refactor for one integration point.
+  // Handle auto-sync on reconnect
+  const handleSync = useCallback(async () => {
+    if (!isOnline || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const result = await syncPendingActions();
+      if (result.synced > 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `✅ **Reconnected**: Synchronized ${result.synced} offline queued action(s) with server.`,
+          },
+        ]);
+      }
+      const remaining = await getPendingActionCount();
+      setPendingSyncCount(remaining);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isOnline, isSyncing]);
+
+  useEffect(() => {
+    if (isOnline) {
+      handleSync();
+    }
+  }, [isOnline, handleSync]);
+
   useEffect(() => {
     function handleOpen(e: Event) {
       setOpen(true);
@@ -59,9 +111,50 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
   async function send(text: string) {
     if (!text.trim() || streaming) return;
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: "" }]);
+    trackBehaviorEvent("search", undefined, { query: text });
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: text },
+      { role: "assistant", content: "" },
+    ]);
     setStreaming(true);
 
+    // OFFLINE FALLBACK MODE
+    if (!isOnline) {
+      setTimeout(async () => {
+        const rbacRole = role === "admin" ? "maintainer" : "researcher";
+        const offlineResult = matchOfflineQuery(text, rbacRole);
+
+        if (offlineResult.kind === "queued_action" && offlineResult.queuedAction) {
+          await offlineDb.pendingActionQueue.add({
+            actionType: offlineResult.queuedAction.actionType,
+            capabilityKey: offlineResult.queuedAction.capabilityKey,
+            params: offlineResult.queuedAction.params,
+            summary: offlineResult.queuedAction.summary,
+            queuedAt: new Date().toISOString(),
+            status: "queued_offline",
+          });
+          const count = await getPendingActionCount();
+          setPendingSyncCount(count);
+        }
+
+        setMessages((prev) => {
+          const next = [...prev];
+          next[next.length - 1] = {
+            role: "assistant",
+            content: offlineResult.textResponse,
+            isOffline: true,
+            targetRoute: offlineResult.targetRoute,
+          };
+          return next;
+        });
+        setStreaming(false);
+      }, 250);
+      return;
+    }
+
+    // ONLINE STREAMING PIPELINE
     try {
       const res = await fetch("/api/vault/chat", {
         method: "POST",
@@ -102,13 +195,16 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
             return next;
           });
         } catch {
-          // Malformed marker payload — ignore, the text response already rendered fine.
+          // Malformed marker payload — ignore
         }
       }
     } catch {
       setMessages((prev) => {
         const next = [...prev];
-        next[next.length - 1] = { role: "assistant", content: "VAULT is temporarily unavailable. Try again in a moment." };
+        next[next.length - 1] = {
+          role: "assistant",
+          content: "VAULT is temporarily unavailable. Try again in a moment.",
+        };
         return next;
       });
     } finally {
@@ -146,9 +242,17 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
         className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center"
         style={{ background: "linear-gradient(135deg, #2dd4bf 0%, #84cc16 100%)" }}
       >
-        <motion.div animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}>
+        <motion.div
+          animate={{ opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+        >
           {open ? <X className="w-6 h-6 text-black" /> : <Sparkles className="w-6 h-6 text-black" />}
         </motion.div>
+        {!isOnline && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center text-[10px] text-black font-bold">
+            !
+          </span>
+        )}
       </motion.button>
 
       <AnimatePresence>
@@ -159,26 +263,61 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="fixed bottom-24 right-5 z-40 w-[380px] max-w-[calc(100vw-2.5rem)] h-[560px] max-h-[calc(100vh-8rem)] bg-vault-surface border border-vault-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           >
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-vault-border">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg" style={{ background: "linear-gradient(135deg, #2dd4bf 0%, #84cc16 100%)" }} />
-                <span className="text-sm font-semibold">VAULT</span>
+                <div
+                  className="w-6 h-6 rounded-lg"
+                  style={{ background: "linear-gradient(135deg, #2dd4bf 0%, #84cc16 100%)" }}
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold leading-none">VAULT</span>
+                  {!isOnline && (
+                    <span className="text-[10px] text-amber-400 font-medium flex items-center gap-1 mt-0.5">
+                      <WifiOff className="w-2.5 h-2.5" /> Offline Mode
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={newConversation} className="p-1.5 text-vault-muted hover:text-vault-text rounded-lg hover:bg-vault-elevated" title="New conversation">
+                {pendingSyncCount > 0 && isOnline && (
+                  <button
+                    onClick={handleSync}
+                    disabled={isSyncing}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-vault-elevated text-vault-teal text-[11px] hover:bg-vault-border"
+                    title="Sync queued offline actions"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`} />
+                    Sync ({pendingSyncCount})
+                  </button>
+                )}
+                <button
+                  onClick={newConversation}
+                  className="p-1.5 text-vault-muted hover:text-vault-text rounded-lg hover:bg-vault-elevated"
+                  title="New conversation"
+                >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={openHistory} className="p-1.5 text-vault-muted hover:text-vault-text rounded-lg hover:bg-vault-elevated" title="History">
+                <button
+                  onClick={openHistory}
+                  className="p-1.5 text-vault-muted hover:text-vault-text rounded-lg hover:bg-vault-elevated"
+                  title="History"
+                >
                   <History className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
+            {/* Content / Chat Area */}
             {showHistory ? (
               <div className="flex-1 overflow-y-auto p-3 space-y-1">
                 {history.length === 0 && <p className="text-xs text-vault-muted p-2">No past conversations yet.</p>}
                 {history.map((h) => (
-                  <button key={h.id} onClick={() => loadConversation(h.id)} className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-vault-elevated truncate">
+                  <button
+                    key={h.id}
+                    onClick={() => loadConversation(h.id)}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-vault-elevated truncate"
+                  >
                     {h.title ?? "Untitled"}
                   </button>
                 ))}
@@ -189,12 +328,18 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
                   {messages.length === 0 && (
                     <div className="space-y-2">
                       <p className="text-xs text-vault-muted mb-3">
-                        {context.submissionId || context.programId
+                        {!isOnline
+                          ? "⚡ You are offline. VAULT can answer questions from the local knowledge base or navigate cached pages."
+                          : context.submissionId || context.programId
                           ? "I can see what you're looking at — ask away."
-                          : "Ask me anything about scope, severity, or your reports."}
+                          : "Ask me anything about scope, severity, platform tools, or actions."}
                       </p>
                       {quickActions.map((q) => (
-                        <button key={q} onClick={() => send(q)} className="block w-full text-left text-xs px-3 py-2 rounded-lg bg-vault-elevated hover:bg-vault-border transition-colors">
+                        <button
+                          key={q}
+                          onClick={() => send(q)}
+                          className="block w-full text-left text-xs px-3 py-2 rounded-lg bg-vault-elevated hover:bg-vault-border transition-colors"
+                        >
                           {q}
                         </button>
                       ))}
@@ -202,14 +347,26 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
                   )}
                   {messages.map((m, i) => (
                     <div key={i} className={`text-sm ${m.role === "user" ? "text-right" : ""} space-y-2`}>
-                      <div className={`inline-block max-w-[85%] rounded-xl px-3 py-2 text-left ${
-                        m.role === "user" ? "bg-vault-teal text-black" : "bg-vault-elevated text-vault-text"
-                      }`}>
+                      <div
+                        className={`inline-block max-w-[85%] rounded-xl px-3 py-2 text-left ${
+                          m.role === "user" ? "bg-vault-teal text-black" : "bg-vault-elevated text-vault-text"
+                        }`}
+                      >
                         {m.role === "assistant" ? (
                           <div className="vault-chat-md text-sm leading-relaxed">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content || "…"}</ReactMarkdown>
+                            {m.targetRoute && (
+                              <button
+                                onClick={() => router.push(m.targetRoute!)}
+                                className="mt-2 flex items-center gap-1.5 px-2.5 py-1 bg-vault-surface border border-vault-border rounded-lg text-xs text-vault-teal hover:bg-vault-teal/10 transition-colors"
+                              >
+                                Go to page <ArrowRight className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
-                        ) : m.content}
+                        ) : (
+                          m.content
+                        )}
                       </div>
                       {m.action && (
                         <div>
@@ -220,16 +377,21 @@ export function VaultWidget({ role }: { role: "researcher" | "admin" }) {
                   ))}
                 </div>
 
+                {/* Input Bar */}
                 <div className="p-3 border-t border-vault-border flex items-center gap-2">
                   <input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && send(input)}
-                    placeholder="Ask VAULT..."
+                    placeholder={!isOnline ? "Ask offline VAULT..." : "Ask VAULT..."}
                     className="vault-input flex-1 text-sm"
                     disabled={streaming}
                   />
-                  <button onClick={() => send(input)} disabled={streaming || !input.trim()} className="p-2 rounded-lg bg-vault-teal text-black disabled:opacity-40">
+                  <button
+                    onClick={() => send(input)}
+                    disabled={streaming || !input.trim()}
+                    className="p-2 rounded-lg bg-vault-teal text-black disabled:opacity-40"
+                  >
                     {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
                 </div>

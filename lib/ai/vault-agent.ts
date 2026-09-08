@@ -63,7 +63,8 @@ export function buildSystemPrompt(
   realRole: UserRole,
   contextData: string,
   agentModeEnabled: boolean,
-  responseStyle: "concise" | "detailed" = "concise"
+  responseStyle: "concise" | "detailed" = "concise",
+  personalizationProfileSummary?: string
 ): string {
   const personaPrompt = persona === "researcher" ? RESEARCHER_PERSONA : ADMIN_PERSONA;
 
@@ -90,7 +91,11 @@ To propose an action, end your response with a fenced block exactly like this (i
 Only emit this block when you have a real, specific id from the context provided — if you don't have one, ask the user which item they mean instead of guessing or proposing an action with a placeholder id. Never emit more than one action block per response. If the user is just asking what an action would do, answer in prose only — do not emit an action block for a hypothetical question.`
     : "";
 
-  return `${personaPrompt}${styleInstruction}${actionInstructions}
+  const personalizationBlock = personalizationProfileSummary
+    ? `\n\nUser Profile & Frequent Capabilities (Personalization):\n[DATA]\n${personalizationProfileSummary}\n[/DATA]`
+    : "";
+
+  return `${personaPrompt}${styleInstruction}${personalizationBlock}${actionInstructions}
 
 Current context (may be empty if the user isn't viewing a specific item, or contains data answering a query they just asked):
 [DATA]

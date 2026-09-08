@@ -1,13 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { OnlineStatusProvider } from "@/lib/agent/connectivity-context";
 
 /**
- * VAULTX is a dark-first security platform — the teal-on-black aesthetic
- * IS the brand. We still offer a light mode for accessibility/preference
- * reasons, but default to dark and don't follow system preference
- * automatically (a security dashboard should look consistent across
- * screenshots, demos, and screen-shares regardless of the user's OS theme).
+ * VAULTX is a dark-first security platform.
+ * Also encapsulates OnlineStatusProvider and Service Worker registration.
  */
 export function ThemeProvider({
   children,
@@ -16,15 +15,25 @@ export function ThemeProvider({
   children: React.ReactNode;
   defaultTheme?: string;
 }) {
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.warn("ServiceWorker registration failed:", err);
+      });
+    }
+  }, []);
+
   return (
-    <NextThemesProvider
-      attribute="class"
-      defaultTheme={defaultTheme}
-      enableSystem={defaultTheme === "system"}
-      themes={["dark", "light", "system"]}
-      disableTransitionOnChange={false}
-    >
-      {children}
-    </NextThemesProvider>
+    <OnlineStatusProvider>
+      <NextThemesProvider
+        attribute="class"
+        defaultTheme={defaultTheme}
+        enableSystem={defaultTheme === "system"}
+        themes={["dark", "light", "system"]}
+        disableTransitionOnChange={false}
+      >
+        {children}
+      </NextThemesProvider>
+    </OnlineStatusProvider>
   );
 }
